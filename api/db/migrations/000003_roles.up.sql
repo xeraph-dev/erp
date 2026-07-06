@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS erp.roles_table (
     LIKE erp.base_table INCLUDING ALL,
 
     name    TEXT        UNIQUE NOT NULL,
-    level   SMALLINT    NOT NULL DEFAULT 0,
+    level   SMALLINT    NOT NULL DEFAULT 0
 );
 
 
@@ -37,7 +37,7 @@ VALUES ('admin', 32767), ('user', 0);
 CREATE OR REPLACE FUNCTION erp.prevent_default_roles_modification() RETURNS TRIGGER
     LANGUAGE plpgsql AS $$ BEGIN
     IF OLD.name IN ('admin', 'user') THEN
-        RAISE EXCEPTION 'admin and user roles cannot be modified or deleted'
+        RAISE EXCEPTION 'admin and user roles cannot be modified or deleted';
     END IF;
     RETURN NEW;
 END; $$;

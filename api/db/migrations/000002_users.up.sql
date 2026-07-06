@@ -88,10 +88,10 @@ CREATE OR REPLACE FUNCTION erp.prevent_default_users_modification() RETURNS TRIG
     LANGUAGE plpgsql AS $$ BEGIN
     IF OLD.name IN ('admin', 'system') THEN
         IF NEW IS NULL THEN
-            RAISE EXCEPTION 'admin and system users cannot be deleted'
+            RAISE EXCEPTION 'admin and system users cannot be deleted';
         END IF;
         IF OLD.name <> NEW.name THEN
-            RAISE EXCEPTION 'admin and system user names cannot be modified'
+            RAISE EXCEPTION 'admin and system user names cannot be modified';
         END IF;
     END IF;
     RETURN NEW;
