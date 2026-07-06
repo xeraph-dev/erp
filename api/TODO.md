@@ -3,4 +3,6 @@
 - [x] execute `go mod tidy`
 - [x] install a library to send emails
 - [x] research if is needed an index for the system user
-- [ ] research how to create an index for nullable fields to faster null entries
+- [x] research how to create an index for nullable fields to faster null entries
+- [ ] research how to assign a weight to roles
+- [ ] research for good restrictions of the length of name, email, password fields

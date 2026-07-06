@@ -10,9 +10,8 @@ CREATE TABLE IF NOT EXISTS erp.base_table (
 
 
 CREATE OR REPLACE FUNCTION erp.do_not_change() RETURNS TRIGGER
-    VOLATILE
     LANGUAGE plpgsql AS $$ BEGIN
-    RAISE EXCEPTION 'Cannot modify table %.%', TG_TABLE_SCHEMA, TG_TABLE_NAME;
+    RAISE EXCEPTION 'table %.% cannot be modified', TG_TABLE_SCHEMA, TG_TABLE_NAME;
 END; $$;
 
 

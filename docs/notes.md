@@ -3,8 +3,9 @@
 - the system has a default admin user
 - the only way to create a new user is through the registration process
 - admin role has all permissions
-- it's no possible to modify anything related to the admin, only the password
+- it's no possible to modify the user name of the admin and system users
 - admin role is always the highest role and no one can assign it to another user
+- users can only assign roles with lower level that their own role
 - all tables should have a `created_by`, `updated_by` and `deleted_by` if needed, expect the `users` table
 - there is a `system` user that represents the system itself in the `*_by` fields
 - each role can has multiple permissions
@@ -17,4 +18,5 @@
   - admin: the highest privileged user, with role `admin`
   - user: the new users of the system, with role `user`
 - the default roles cannot be changed or deleted because they are used by the system
+- all users have the user role and there is no possible to remove that role from the user
 - permissions are readonly because they are used by the system, the user cannot modify nor delete a permission

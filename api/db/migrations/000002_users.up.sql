@@ -25,7 +25,7 @@ EXECUTE PROCEDURE erp.update_updated_at();
 
 
 INSERT INTO erp.users_table (name, password, email)
-VALUES ('system', '', '');
+VALUES ('system', '', '_'), ('admin', '', '');
 
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS erp.users_system AS
@@ -35,7 +35,7 @@ WITH DATA;
 
 
 CREATE OR REPLACE FUNCTION erp.system_user_id() RETURNS UUID
-    IMMUTABLE
+    STABLE
     LANGUAGE plpgsql AS $$ BEGIN
     return (SELECT id FROM erp.users_system LIMIT 1);
 END; $$;
@@ -79,5 +79,27 @@ WHERE deleted_at IS NULL AND deleted_by_id IS NULL;
 
 CREATE OR REPLACE VIEW erp.users AS
 SELECT * FROM erp.users_table
-WHERE deleted_at IS NULL
+WHERE name <> 'system'
+  AND deleted_at IS NULL
   AND deleted_by_id IS NULL;
+
+
+CREATE OR REPLACE FUNCTION erp.prevent_default_users_modification() RETURNS TRIGGER
+    LANGUAGE plpgsql AS $$ BEGIN
+    IF OLD.name IN ('admin', 'system') THEN
+        IF NEW IS NULL THEN
+            RAISE EXCEPTION 'admin and system users cannot be deleted'
+        END IF;
+        IF OLD.name <> NEW.name THEN
+            RAISE EXCEPTION 'admin and system user names cannot be modified'
+        END IF;
+    END IF;
+    RETURN NEW;
+END; $$;
+
+
+CREATE OR REPLACE TRIGGER prevent_default_users_modification
+    BEFORE UPDATE OR DELETE
+    ON erp.users_table
+    FOR EACH ROW
+EXECUTE PROCEDURE erp.prevent_default_users_modification();
