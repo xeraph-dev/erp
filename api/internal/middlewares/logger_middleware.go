@@ -1,0 +1,24 @@
+package middlewares
+
+import (
+	"context"
+	"log/slog"
+	"net/http"
+)
+
+const LoggerKey = "logger"
+
+func Logger(logger *slog.Logger) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			ctx = context.WithValue(ctx, LoggerKey, logger)
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func GetLogger(ctx context.Context) *slog.Logger {
+	return ctx.Value(LoggerKey).(*slog.Logger)
+}
