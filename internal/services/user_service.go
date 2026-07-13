@@ -1,8 +1,8 @@
 package services
 
 import (
-	"api/internal/models"
-	"api/internal/repositories"
+	"erp/internal/models"
+	"erp/internal/repositories"
 	"context"
 
 	"github.com/jackc/pgx/v5/pgxpool"

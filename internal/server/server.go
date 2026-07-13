@@ -1,7 +1,7 @@
 package server
 
 import (
-	"api/internal/middlewares"
+	"erp/internal/middlewares"
 	"net/http"
 )
 

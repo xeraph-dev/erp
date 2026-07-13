@@ -1,8 +1,9 @@
-module api
+module erp
 
 go 1.26.4
 
 require (
+	github.com/caarlos0/env/v10 v10.0.0
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
