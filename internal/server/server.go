@@ -1,80 +1,99 @@
 package server
 
 import (
+	"erp/internal/controllers"
 	"erp/internal/middlewares"
+	"erp/internal/repositories"
+	"erp/internal/services"
+	"fmt"
 	"net/http"
+	"reflect"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type Group struct {
-	mux         *http.ServeMux
-	middlewares []middlewares.Middleware
-	handlers    map[string]http.Handler
-	groups      []Group
-}
-
-func NewGroup(mux *http.ServeMux) (group Group) {
-	group.mux = mux
-	group.handlers = make(map[string]http.Handler)
-	return
-}
-
-func (g *Group) Use(middlewares ...middlewares.Middleware) {
-	g.middlewares = append(g.middlewares, middlewares...)
-}
-
-func (g *Group) HandleFunc(pattern string, handler http.HandlerFunc) {
-	g.handlers[pattern] = handler
-}
-
-func (g *Group) Group(group func(g *Group)) {
-	ng := NewGroup(g.mux)
-	ng.middlewares = make([]middlewares.Middleware, len(g.middlewares))
-	copy(ng.middlewares, g.middlewares)
-	group(&ng)
-	ng.Chain()
-}
-
-func (g *Group) Chain() {
-	for pattern, handler := range g.handlers {
-		for i := len(g.middlewares) - 1; i >= 0; i-- {
-			handler = g.middlewares[i](handler)
-		}
-		g.mux.Handle(pattern, handler)
-	}
-}
-
 type Server struct {
-	mux         *http.ServeMux
-	middlewares []middlewares.Middleware
+	mux          *http.ServeMux
+	middlewares  []middlewares.Middleware
+	pool         *pgxpool.Pool
+	repositories []repositories.Repository
+	services     []services.Service
 }
+
+var _ Router = &Server{}
 
 func NewServer() (server Server) {
 	server.mux = http.NewServeMux()
 	return
 }
 
-func (s *Server) Use(middlewares ...middlewares.Middleware) {
-	s.middlewares = append(s.middlewares, middlewares...)
+func (server *Server) Use(middlewares ...middlewares.Middleware) {
+	server.middlewares = append(server.middlewares, middlewares...)
 }
 
-func (s *Server) HandleFunc(pattern string, handler http.HandlerFunc) {
-	s.mux.HandleFunc(pattern, handler)
+func (server *Server) Add(controllers ...controllers.Controller) {
+	for _, controller := range controllers {
+		v := reflect.ValueOf(controller).Elem()
+
+		for st, sv := range v.FieldByName("Services").Fields() {
+			for _, service := range server.services {
+				if reflect.TypeOf(service).Implements(st.Type) {
+					sv.Set(reflect.ValueOf(service))
+				}
+			}
+		}
+
+		server.mux.Handle(controller.Pattern(), controller)
+	}
 }
 
-func (s *Server) Group(group func(g *Group)) {
-	g := NewGroup(s.mux)
-	group(&g)
-	g.Chain()
+func (server *Server) Database(pool *pgxpool.Pool) {
+	server.pool = pool
 }
 
-func (s *Server) Serve(addr string) error {
-	return http.ListenAndServe(addr, s.chain())
+func (server *Server) RepoRegister(repositories ...repositories.Repository) {
+	server.repositories = append(server.repositories, repositories...)
 }
 
-func (s *Server) chain() http.Handler {
-	handler := http.Handler(s.mux)
-	for i := len(s.middlewares) - 1; i >= 0; i-- {
-		handler = s.middlewares[i](handler)
+func (server *Server) ServiceRegister(services ...services.Service) {
+	for _, service := range services {
+		v := reflect.ValueOf(service).Elem()
+
+		dbv := v.FieldByName("DB")
+		dbv.Set(reflect.ValueOf(server.pool))
+
+		if dbv.IsNil() {
+			panic("missing an implementation of a database driver")
+		}
+
+		for rt, rv := range v.FieldByName("Repos").Fields() {
+			for _, repo := range server.repositories {
+				if reflect.TypeOf(repo).Implements(rt.Type) {
+					rv.Set(reflect.ValueOf(repo))
+				}
+			}
+			if rv.IsNil() {
+				panic(fmt.Sprintf("missing an implementation of %s", rt.Type))
+			}
+		}
+
+		server.services = append(server.services, service)
+	}
+}
+
+func (server *Server) Group(groupFunc func(g *Group)) {
+	group := NewGroup(server.mux, server.services)
+	groupFunc(&group)
+	group.Chain()
+}
+func (server *Server) Serve(addr string) error {
+	return http.ListenAndServe(addr, server.chain())
+}
+
+func (server *Server) chain() http.Handler {
+	handler := http.Handler(server.mux)
+	for i := len(server.middlewares) - 1; i >= 0; i-- {
+		handler = server.middlewares[i](handler)
 	}
 	return handler
 }

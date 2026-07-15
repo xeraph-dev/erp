@@ -9,10 +9,9 @@ type Config struct {
 	Port        uint16 `env:"PORT" envDefault:"8080"`
 }
 
-func Load() (config *Config, err error) {
-	cfg := new(Config)
-	if err = env.Parse(cfg); err != nil {
-		cfg = nil
+func Load() (config Config, err error) {
+	if err = env.Parse(&config); err != nil {
+		return
 	}
 	return
 }

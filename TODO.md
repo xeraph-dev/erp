@@ -7,3 +7,4 @@
 - [ ] research how to assign a weight to roles
 - [ ] research for good restrictions of the length of name, email, password fields
 - [x] postgresql has default values when NULL in variable assignment? ([file](./db/migrations/000002_users_table.up.sql))
+- [ ] research about value objects

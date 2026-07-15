@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"erp/internal/config"
-	"erp/internal/handlers"
+	"erp/internal/controllers"
 	"erp/internal/middlewares"
+	"erp/internal/repositories"
 	"erp/internal/server"
+	"erp/internal/services"
 	"fmt"
 	"log/slog"
 	"os"
@@ -37,19 +39,32 @@ func main() {
 	}
 	_ = pool
 
-	s := server.NewServer()
+	server := server.NewServer()
 
-	s.Use(middlewares.Logger(logger))
-	s.Use(middlewares.RequestID)
-	s.Use(middlewares.HTTPLogger)
-	s.Use(middlewares.Recoverer)
-	s.Use(middlewares.Database(pool))
+	server.Use(
+		middlewares.Logger(logger),
+		middlewares.RequestID,
+		middlewares.HTTPLogger,
+		middlewares.Recoverer,
+	)
 
-	s.HandleFunc(handlers.AuthRegisterPattern, handlers.AuthRegister)
+	server.Database(pool)
+
+	server.RepoRegister(
+		repositories.UserRepositoryImpl{},
+	)
+
+	server.ServiceRegister(
+		&services.UserServiceImpl{},
+	)
+
+	server.Add(
+		&controllers.AuthRegisterController{},
+	)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
-	logger.Info("starting server at", slog.String("addr", addr))
-	if err := s.Serve(addr); err != nil {
+	logger.Info("starting server", slog.String("addr", addr))
+	if err := server.Serve(addr); err != nil {
 		logger.Error("failed to start server", "error", err)
 		os.Exit(1)
 	}

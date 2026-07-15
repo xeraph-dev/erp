@@ -1,3 +1,3 @@
-INSERT INTO erp.users (name, password, email)
+INSERT INTO erp.users (username, password_hash, email)
 VALUES ($1, $2, $3)
-RETURNING *;
+RETURNING id, username, password_hash, email, first_name, last_name;
