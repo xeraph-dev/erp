@@ -68,7 +68,10 @@ func (service userServiceImpl) Register(ctx context.Context, in dtos.UserRegiste
 func (service userServiceImpl) Login(ctx context.Context, in dtos.UserLogin) (out dtos.User, err error) {
 	logger := middlewares.GetLogger(ctx)
 
-	model := models.NewUserFromLoginDTO(in)
+	model, err := models.NewUserFromLoginDTO(in)
+	if err != nil {
+		return
+	}
 
 	var user models.User
 	if err = withTx(ctx, service.db, func(tx pgx.Tx) (err error) {

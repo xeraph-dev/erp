@@ -17,9 +17,9 @@ var (
 
 type User struct {
 	ID           uuid.UUID        `db:"id"`
-	Username     string           `db:"username"`
+	Username     vos.Username     `db:"username"`
 	PasswordHash vos.PasswordHash `db:"password_hash"`
-	Email        string           `db:"email"`
+	Email        vos.Email        `db:"email"`
 	FirstName    sql.NullString   `db:"first_name"`
 	LastName     sql.NullString   `db:"last_name"`
 }
@@ -27,33 +27,48 @@ type User struct {
 func NewUserFromRegisterDTO(ctx context.Context, dto dtos.UserRegister) (model User, err error) {
 	logger := middlewares.GetLogger(ctx)
 
-	passwordHash, err := vos.NewPasswordHash(dto.Password)
+	username, err := vos.NewUsername(dto.Username)
 	if err != nil {
-		logger.ErrorContext(ctx, ErrGeneratingPassword.Error(), "error", err)
+		return
+	}
+
+	passwordHash, err := vos.NewPasswordHash(ctx, dto.Password)
+	if err != nil {
+		logger.ErrorContext(ctx, "hashing password", "error", err)
 		err = ErrGeneratingPassword
 		return
 	}
 
+	email, err := vos.NewEmail(dto.Email)
+	if err != nil {
+		return
+	}
+
 	model = User{
-		Username:     dto.Username,
+		Username:     username,
 		PasswordHash: passwordHash,
-		Email:        dto.Email,
+		Email:        email,
 	}
 
 	return
 }
 
-func NewUserFromLoginDTO(dto dtos.UserLogin) (model User) {
-	return User{
-		Username: dto.Username,
+func NewUserFromLoginDTO(dto dtos.UserLogin) (model User, err error) {
+	username, err := vos.NewUsername(dto.Username)
+	if err != nil {
+		return
 	}
+	model = User{
+		Username: username,
+	}
+	return
 }
 
 func (user User) DTO() dtos.User {
 	return dtos.User{
 		ID:        user.ID,
-		Username:  user.Username,
-		Email:     user.Email,
+		Username:  string(user.Username),
+		Email:     string(user.Email),
 		FirstName: user.FirstName.String,
 		LastName:  user.LastName.String,
 	}

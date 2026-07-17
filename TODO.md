@@ -4,12 +4,18 @@
 - [x] install a library to send emails
 - [x] research if is needed an index for the system user
 - [x] research how to create an index for nullable fields to faster null entries
-- [ ] research how to assign a weight to roles
-- [ ] research for good restrictions of the length of name, email, password fields
+- [x] research how to assign a weight to roles
+- [x] research for good restrictions of the length of name, email, password fields
 - [x] postgresql has default values when NULL in variable assignment? ([file](./db/migrations/000002_users_table.up.sql))
 - [x] research about value objects
-- [ ] add `application/json` `Content-Type` to the response
-- [ ] add middleware to reject non-`application/json` `Content-Type` in requests
-- [ ] implement graceful shutdown of the server
+- [x] add `application/json` `Content-Type` to the response
+- [x] add middleware to reject non-`application/json` `Content-Type` in requests
+- [x] implement graceful shutdown of the server
 - [ ] implement **timeout** middleware to prevent the user to wait for long tasks
 - [ ] implement **limit** middleware to prevent the system be called multiple times from the same IP
+- [ ] find a better email regex (golang and postgresql syntax)
+- [ ] research the viability of having the VO constraints also in the database
+- [ ] research how to manage errors
+  - should the errors be encapsuled in each layer?
+  - errors in vos package should be returned outside the models layer?
+  - errors in repository layer should be returned outside the service layer?

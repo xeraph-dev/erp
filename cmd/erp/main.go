@@ -17,6 +17,7 @@ import (
 	_ "github.com/golang-jwt/jwt/v5"
 	_ "github.com/golang-migrate/migrate/v4"
 	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/redis/go-redis/v9"
 	_ "github.com/spf13/viper"
 	_ "github.com/stretchr/testify"
 )
