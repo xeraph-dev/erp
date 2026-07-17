@@ -8,6 +8,7 @@ import (
 	"erp/internal/repositories"
 	"errors"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -24,18 +25,20 @@ type UserService interface {
 	Login(ctx context.Context, in dtos.UserLogin) (out dtos.User, err error)
 }
 
-type UserServiceImpl struct {
-	DB    *pgxpool.Pool
-	Repos struct {
-		User repositories.UserRepository
-	}
+type userServiceImpl struct {
+	db    *pgxpool.Pool
+	users repositories.UserRepository
 }
 
-var _ UserService = UserServiceImpl{}
+var _ UserService = (*userServiceImpl)(nil)
 
-func (service UserServiceImpl) __internal() {}
+func NewUserService(db *pgxpool.Pool, users repositories.UserRepository) UserService {
+	return userServiceImpl{db, users}
+}
 
-func (service UserServiceImpl) Register(ctx context.Context, in dtos.UserRegister) (out dtos.User, err error) {
+func (service userServiceImpl) __internal() {}
+
+func (service userServiceImpl) Register(ctx context.Context, in dtos.UserRegister) (out dtos.User, err error) {
 	logger := middlewares.GetLogger(ctx)
 
 	model, err := models.NewUserFromRegisterDTO(ctx, in)
@@ -45,26 +48,41 @@ func (service UserServiceImpl) Register(ctx context.Context, in dtos.UserRegiste
 		return
 	}
 
-	user, err := service.Repos.User.Create(ctx, service.DB, model)
-	if err != nil {
-		logger.ErrorContext(ctx, "creating entry", "error", err)
-		err = ErrRegisteringUser
+	if err = withTx(ctx, service.db, func(tx pgx.Tx) (err error) {
+		user, err := service.users.Create(ctx, tx, model)
+		if err != nil {
+			logger.ErrorContext(ctx, "creating entry", "error", err)
+			err = ErrRegisteringUser
+			return
+		}
+
+		out = user.DTO()
+		return
+	}); err != nil {
 		return
 	}
 
-	out = user.DTO()
 	return
 }
 
-func (service UserServiceImpl) Login(ctx context.Context, in dtos.UserLogin) (out dtos.User, err error) {
+func (service userServiceImpl) Login(ctx context.Context, in dtos.UserLogin) (out dtos.User, err error) {
 	logger := middlewares.GetLogger(ctx)
 
 	model := models.NewUserFromLoginDTO(in)
 
-	user, err := service.Repos.User.GetByName(ctx, service.DB, model)
-	if err != nil {
-		logger.ErrorContext(ctx, "getting user by name", "error", err)
-		err = ErrUserNotExists
+	var user models.User
+	if err = withTx(ctx, service.db, func(tx pgx.Tx) (err error) {
+		user, err = service.users.GetByName(ctx, tx, model)
+		if errors.Is(err, repositories.ErrNotFound) {
+			err = ErrUserNotExists
+			return
+		} else if err != nil {
+			logger.ErrorContext(ctx, "getting user by name", "error", err)
+			err = ErrLoginUser
+			return
+		}
+		return
+	}); err != nil {
 		return
 	}
 

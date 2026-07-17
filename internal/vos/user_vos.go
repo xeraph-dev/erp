@@ -14,5 +14,5 @@ func NewPasswordHash(raw string) (hash PasswordHash, err error) {
 }
 
 func (hash PasswordHash) Matches(raw string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(raw)) != nil
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(raw)) == nil
 }

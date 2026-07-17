@@ -6,6 +6,7 @@ import (
 )
 
 type Router interface {
+	__internal()
 	Use(middlewares ...middlewares.Middleware)
 	Add(controller ...controllers.Controller)
 }

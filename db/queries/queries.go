@@ -7,3 +7,6 @@ var CreateUser string
 
 //go:embed GetUserByName.sql
 var GetUserByName string
+
+//go:embed SetCurrentUserID.sql
+var SetCurrentUserID string

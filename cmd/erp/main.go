@@ -43,23 +43,17 @@ func main() {
 
 	server.Use(
 		middlewares.Logger(logger),
+		middlewares.Recoverer,
 		middlewares.RequestID,
 		middlewares.HTTPLogger,
-		middlewares.Recoverer,
+		middlewares.Codec,
 	)
 
-	server.Database(pool)
-
-	server.RepoRegister(
-		repositories.UserRepositoryImpl{},
-	)
-
-	server.ServiceRegister(
-		&services.UserServiceImpl{},
-	)
+	userRepo := repositories.NewUserRepository()
+	userService := services.NewUserService(pool, userRepo)
 
 	server.Add(
-		&controllers.AuthRegisterController{},
+		controllers.NewAuthRegisterController(userService),
 	)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)

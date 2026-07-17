@@ -22,13 +22,17 @@ type UserRepository interface {
 	GetByName(ctx context.Context, db Querier, in models.User) (out models.User, err error)
 }
 
-type UserRepositoryImpl struct{}
+type userRepositoryImpl struct{}
 
-var _ UserRepository = UserRepositoryImpl{}
+var _ UserRepository = (*userRepositoryImpl)(nil)
 
-func (UserRepositoryImpl) __internal() {}
+func NewUserRepository() UserRepository {
+	return userRepositoryImpl{}
+}
 
-func (UserRepositoryImpl) Create(ctx context.Context, db Querier, in models.User) (out models.User, err error) {
+func (userRepositoryImpl) __internal() {}
+
+func (userRepositoryImpl) Create(ctx context.Context, db Querier, in models.User) (out models.User, err error) {
 	logger := middlewares.GetLogger(ctx)
 
 	rows, err := db.Query(ctx, queries.CreateUser, in.Username, in.PasswordHash, in.Email)
@@ -46,7 +50,7 @@ func (UserRepositoryImpl) Create(ctx context.Context, db Querier, in models.User
 	return
 }
 
-func (UserRepositoryImpl) GetByName(ctx context.Context, db Querier, in models.User) (out models.User, err error) {
+func (userRepositoryImpl) GetByName(ctx context.Context, db Querier, in models.User) (out models.User, err error) {
 	logger := middlewares.GetLogger(ctx)
 
 	rows, err := db.Query(ctx, queries.GetUserByName, in.Username)
@@ -57,7 +61,9 @@ func (UserRepositoryImpl) GetByName(ctx context.Context, db Querier, in models.U
 	}
 
 	out, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[models.User])
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
+		err = ErrNotFound
+	} else if err != nil {
 		logger.ErrorContext(ctx, "colleting user", "error", err)
 		err = ErrGettingUser
 		return
