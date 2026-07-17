@@ -1,9 +1,15 @@
 package server
 
 import (
+	"context"
 	"erp/internal/controllers"
 	"erp/internal/middlewares"
+	"errors"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 type Server struct {
@@ -36,7 +42,30 @@ func (server *Server) Group(groupFunc func(g *Group)) {
 	group.Chain()
 }
 func (server *Server) Serve(addr string) error {
-	return http.ListenAndServe(addr, server.chain())
+	httpServer := &http.Server{
+		Addr:    addr,
+		Handler: server.chain(),
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+		close(errCh)
+	}()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-sigCh:
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		return httpServer.Shutdown(ctx)
+	}
 }
 
 func (server *Server) chain() http.Handler {

@@ -37,7 +37,7 @@ func main() {
 		logger.ErrorContext(ctx, "database error", "error", err)
 		os.Exit(1)
 	}
-	_ = pool
+	defer pool.Close()
 
 	server := server.NewServer()
 
@@ -59,7 +59,8 @@ func main() {
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	logger.Info("starting server", slog.String("addr", addr))
 	if err := server.Serve(addr); err != nil {
-		logger.Error("failed to start server", "error", err)
+		logger.Error("server error", "error", err)
 		os.Exit(1)
 	}
+	logger.Info("shutdown complete")
 }
