@@ -27,16 +27,18 @@ func (controller AuthRegisterController) ServeHTTP(w http.ResponseWriter, r *htt
 	var dto dtos.UserRegister
 	if err := codec.Decode(r.Body, &dto); err != nil {
 		logger.ErrorContext(ctx, "decoding request", "error", err)
-		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
 
 	user, err := controller.users.Register(ctx, dto)
 	if err != nil {
 		logger.ErrorContext(ctx, "registering user", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+
+	// w.Header().Add("Set-Cookie", "")
 
 	w.WriteHeader(http.StatusCreated)
 	if err := codec.Encode(w, user); err != nil {

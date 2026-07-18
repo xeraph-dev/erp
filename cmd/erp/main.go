@@ -17,6 +17,8 @@ import (
 	_ "github.com/golang-jwt/jwt/v5"
 	_ "github.com/golang-migrate/migrate/v4"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
+	_ "github.com/joho/godotenv"
 	_ "github.com/redis/go-redis/v9"
 	_ "github.com/spf13/viper"
 	_ "github.com/stretchr/testify"
@@ -26,6 +28,11 @@ func main() {
 	ctx := context.Background()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	if err := godotenv.Load(); err != nil {
+		logger.ErrorContext(ctx, "dotenv error", "error", err)
+		os.Exit(1)
+	}
 
 	cfg, err := config.Load()
 	if err != nil {

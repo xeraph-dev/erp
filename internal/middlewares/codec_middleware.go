@@ -16,26 +16,35 @@ const codecKey = "codec"
 
 func Codec(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		raw := r.Header.Get("Content-Type")
-		if raw == "" {
-			// TODO: add missing content type error
-			w.WriteHeader(http.StatusBadRequest)
+		contentTypeRaw := r.Header.Get("Content-Type")
+		if contentTypeRaw == "" {
+			http.Error(w, "missing Content-Type header", http.StatusBadRequest)
+			return
+		}
+		acceptRaw := r.Header.Get("Accept")
+		if acceptRaw == "" {
+			http.Error(w, "missing Accept header", http.StatusBadRequest)
 			return
 		}
 
-		mediaType, _, err := mime.ParseMediaType(raw)
+		contentType, _, err := mime.ParseMediaType(contentTypeRaw)
 		if err != nil {
-			http.Error(w, "malformed Content-Type", http.StatusBadRequest)
+			http.Error(w, "malformed Content-Type header", http.StatusBadRequest)
+			return
+		}
+		accept, _, err := mime.ParseMediaType(acceptRaw)
+		if err != nil {
+			http.Error(w, "malformed Accept header", http.StatusBadRequest)
 			return
 		}
 
-		codec, ok := codecs.Get(mediaType)
+		codec, ok := codecs.NewCodec(contentType, accept)
 		if !ok {
 			http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
 			return
 		}
 
-		w.Header().Set("Content-Type", codec.ContentType())
+		w.Header().Set("Content-Type", codec.EncodeContentType())
 
 		ctx := context.WithValue(r.Context(), codecKey, codec)
 		next.ServeHTTP(w, r.WithContext(ctx))

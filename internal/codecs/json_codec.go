@@ -5,11 +5,15 @@ import (
 	"io"
 )
 
-type jsonCodec struct{}
+type jsonDecoder struct{}
+type jsonEncoder struct{}
 
-var _ Codec = (*jsonCodec)(nil)
+var _ Decoder = (*jsonDecoder)(nil)
+var _ Encoder = (*jsonEncoder)(nil)
 
-func (jsonCodec) __internal()                     {}
-func (jsonCodec) ContentType() string             { return "application/json" }
-func (jsonCodec) Decode(r io.Reader, v any) error { return json.NewDecoder(r).Decode(v) }
-func (jsonCodec) Encode(w io.Writer, v any) error { return json.NewEncoder(w).Encode(v) }
+func (jsonDecoder) __internal()                     {}
+func (jsonEncoder) __internal()                     {}
+func (jsonDecoder) ContentType() string             { return "application/json" }
+func (jsonEncoder) ContentType() string             { return "application/json" }
+func (jsonDecoder) Decode(r io.Reader, v any) error { return json.NewDecoder(r).Decode(v) }
+func (jsonEncoder) Encode(r io.Writer, v any) error { return json.NewEncoder(r).Encode(v) }

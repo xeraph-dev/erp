@@ -2,19 +2,43 @@ package codecs
 
 import "io"
 
-type Codec interface {
+type Codec struct {
+	decoder Decoder
+	encoder Encoder
+}
+
+func NewCodec(contentType string, accept string) (codec Codec, ok bool) {
+	switch contentType {
+	case "application/json":
+		codec.decoder = jsonDecoder{}
+	case "application/xml", "text/xml":
+		codec.decoder = xmlDecoder{}
+	default:
+		codec.decoder = jsonDecoder{}
+	}
+	switch accept {
+	case "application/json":
+		codec.encoder = jsonEncoder{}
+	case "application/xml", "text/xml":
+		codec.encoder = jsonEncoder{}
+	default:
+		codec.encoder = jsonEncoder{}
+	}
+	return
+}
+func (codec Codec) Decode(r io.Reader, v any) error { return codec.decoder.Decode(r, v) }
+func (codec Codec) Encode(w io.Writer, v any) error { return codec.encoder.Encode(w, v) }
+func (codec Codec) DecodeContentType() string       { return codec.decoder.ContentType() }
+func (codec Codec) EncodeContentType() string       { return codec.encoder.ContentType() }
+
+type Encoder interface {
 	__internal()
 	ContentType() string
-	Decode(r io.Reader, v any) error
-	Encode(w io.Writer, v any) error
+	Encode(r io.Writer, v any) error
 }
 
-var registry = map[string]Codec{
-	"application/json": jsonCodec{},
-	"text/xml":         xmlCodec{},
-}
-
-func Get(contentType string) (codec Codec, ok bool) {
-	codec, ok = registry[contentType]
-	return
+type Decoder interface {
+	__internal()
+	ContentType() string
+	Decode(w io.Reader, v any) error
 }
