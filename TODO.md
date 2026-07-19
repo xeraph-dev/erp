@@ -19,3 +19,4 @@
   - should the errors be encapsuled in each layer?
   - errors in vos package should be returned outside the models layer?
   - errors in repository layer should be returned outside the service layer?
+- [ ] implement head and options methods

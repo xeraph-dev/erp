@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"erp/internal/config"
-	"erp/internal/controllers"
+	"erp/internal/handlers"
 	"erp/internal/middlewares"
 	"erp/internal/repositories"
 	"erp/internal/server"
@@ -34,13 +34,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	cfg, err := config.Load()
+	config, err := config.New()
 	if err != nil {
 		logger.ErrorContext(ctx, "config error", "error", err)
 		os.Exit(1)
 	}
 
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	pool, err := pgxpool.New(ctx, config.DatabaseURL)
 	if err != nil {
 		logger.ErrorContext(ctx, "database error", "error", err)
 		os.Exit(1)
@@ -58,13 +58,15 @@ func main() {
 	)
 
 	userRepo := repositories.NewUserRepository()
-	userService := services.NewUserService(pool, userRepo)
 
-	server.Add(
-		controllers.NewAuthRegisterController(userService),
+	userService := services.NewUserService(pool, userRepo)
+	jwtService := services.NewJWTService(config.JWTSecret)
+
+	server.Handle(
+		handlers.NewAuthRegisterHandler(userService, jwtService),
 	)
 
-	addr := fmt.Sprintf(":%d", cfg.Port)
+	addr := fmt.Sprintf(":%d", config.Port)
 	logger.Info("starting server", slog.String("addr", addr))
 	if err := server.Serve(addr); err != nil {
 		logger.Error("server error", "error", err)

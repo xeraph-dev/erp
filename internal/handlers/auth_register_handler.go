@@ -1,4 +1,4 @@
-package controllers
+package handlers
 
 import (
 	"erp/internal/dtos"
@@ -7,19 +7,20 @@ import (
 	"net/http"
 )
 
-type AuthRegisterController struct {
+type AuthRegisterHandler struct {
 	users services.UserService
+	jwt   services.JWTService
 }
 
-var _ Controller = (*AuthRegisterController)(nil)
+var _ Handler = (*AuthRegisterHandler)(nil)
 
-func NewAuthRegisterController(users services.UserService) Controller {
-	return AuthRegisterController{users}
+func NewAuthRegisterHandler(users services.UserService, jwt services.JWTService) Handler {
+	return AuthRegisterHandler{users, jwt}
 }
 
-func (AuthRegisterController) __internal()     {}
-func (AuthRegisterController) Pattern() string { return "POST /api/auth/register" }
-func (controller AuthRegisterController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (AuthRegisterHandler) __internal()     {}
+func (AuthRegisterHandler) Pattern() string { return "POST /api/auth/register" }
+func (handler AuthRegisterHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	logger := middlewares.GetLogger(ctx)
 	codec := middlewares.GetCodec(ctx)
@@ -31,12 +32,16 @@ func (controller AuthRegisterController) ServeHTTP(w http.ResponseWriter, r *htt
 		return
 	}
 
-	user, err := controller.users.Register(ctx, dto)
+	user, err := handler.users.Register(ctx, dto)
 	if err != nil {
 		logger.ErrorContext(ctx, "registering user", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name: "access-token",
+	})
 
 	// w.Header().Add("Set-Cookie", "")
 

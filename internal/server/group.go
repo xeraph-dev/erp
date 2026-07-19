@@ -1,7 +1,7 @@
 package server
 
 import (
-	"erp/internal/controllers"
+	"erp/internal/handlers"
 	"erp/internal/middlewares"
 	"net/http"
 )
@@ -9,7 +9,7 @@ import (
 type Group struct {
 	mux         *http.ServeMux
 	middlewares []middlewares.Middleware
-	controllers []controllers.Controller
+	handlers    []handlers.Handler
 }
 
 var _ Router = (*Group)(nil)
@@ -25,8 +25,8 @@ func (group *Group) Use(middlewares ...middlewares.Middleware) {
 	group.middlewares = append(group.middlewares, middlewares...)
 }
 
-func (group *Group) Add(controllers ...controllers.Controller) {
-	group.controllers = append(group.controllers, controllers...)
+func (group *Group) Handle(handlers ...handlers.Handler) {
+	group.handlers = append(group.handlers, handlers...)
 }
 
 func (group *Group) Group(groupFunc func(g *Group)) {
@@ -38,12 +38,12 @@ func (group *Group) Group(groupFunc func(g *Group)) {
 }
 
 func (group *Group) Chain() {
-	for _, controller := range group.controllers {
-		pattern := controller.Pattern()
-		handler := http.Handler(controller)
+	for _, handler := range group.handlers {
+		pattern := handler.Pattern()
+		chainHandler := http.Handler(handler)
 		for i := len(group.middlewares) - 1; i >= 0; i-- {
-			handler = group.middlewares[i](handler)
+			chainHandler = group.middlewares[i](chainHandler)
 		}
-		group.mux.Handle(pattern, handler)
+		group.mux.Handle(pattern, chainHandler)
 	}
 }

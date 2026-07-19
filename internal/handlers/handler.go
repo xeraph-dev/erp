@@ -1,10 +1,10 @@
-package controllers
+package handlers
 
 import (
 	"net/http"
 )
 
-type Controller interface {
+type Handler interface {
 	http.Handler
 	__internal()
 	Pattern() string

@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	"erp/internal/controllers"
+	"erp/internal/handlers"
 	"erp/internal/middlewares"
 	"errors"
 	"net/http"
@@ -30,9 +30,9 @@ func (server *Server) Use(middlewares ...middlewares.Middleware) {
 	server.middlewares = append(server.middlewares, middlewares...)
 }
 
-func (server *Server) Add(controllers ...controllers.Controller) {
-	for _, controller := range controllers {
-		server.mux.Handle(controller.Pattern(), controller)
+func (server *Server) Handle(handlers ...handlers.Handler) {
+	for _, handler := range handlers {
+		server.mux.Handle(handler.Pattern(), handler)
 	}
 }
 
