@@ -1,27 +1,98 @@
-Para implementar roles y permisos en tu ERP con Go + React, estas son las estrategias y cómo combinarlas:
+# Roles and Permissions (Authorization Model)
 
-**1. RBAC puro (basado en roles)**  
-El usuario tiene un rol (admin, contador, vendedor). Cada endpoint verifica el rol requerido. Es simple pero inflexible: si un rol necesita un permiso puntual, tenés que modificar código o crear un nuevo rol.
+The system uses **Role-Based Access Control (RBAC)** to govern what authenticated users are allowed to do. Authorization is strictly separated from authentication and follows an additive (allow‑only) permission model.
 
-**2. RBAC con permisos (roles como agrupación de permisos)**  
-El usuario tiene uno o varios roles. Cada rol tiene un conjunto de permisos (ej. `crear_factura`, `ver_reportes`). Los endpoints validan el permiso, no el rol. Es la estrategia más común en ERPs, da granularidad y mantenibilidad. Los roles se administran desde la base de datos.
+---
 
-**3. ABAC (control basado en atributos)**  
-Usa políticas que evalúan atributos del usuario, el recurso y el entorno. Ej: "un supervisor puede ver sólo las facturas de su sucursal". Muy potente pero complejo de implementar. En Go se suele usar con la librería **Casbin**.
+## Core Concepts
 
-**4. ACL (lista de control de acceso)**  
-Se asocian permisos directamente a usuarios y recursos específicos. Por ejemplo, el usuario 5 puede acceder al proyecto 42. Poco escalable para un ERP, excepto para casos muy concretos.
+- **Role:** A named collection of permissions. Each user is assigned exactly one role.
+- **Permission:** A discrete capability to perform a specific action on a specific resource (e.g., `users:read`, `orders:write`).
+- **Additive Model:** Permissions are _allow‑only_. The presence of a permission grants the action; its absence implies denial. Negative/deny rules are not supported.
 
-**5. Implementación en Go: Middleware y JWT**  
-- Al autenticar, incluí en el token JWT los permisos o los roles (payload ligero). Así el frontend puede decidir qué mostrar y el backend validar en cada petición sin consultar la BD en cada request.
-- Creá un middleware que reciba el permiso requerido y lo compare con los claims del JWT. Ej: `middleware.RequirePermission("crear_factura")`.
-- Para cambios de permisos inmediatos, necesitás invalidar el token o usar un tiempo de vida corto y refrescar con las nuevas capacidades.
+---
 
-**6. Almacenamiento en base de datos**  
-Tablas: `users`, `roles`, `permissions`, `user_roles`, `role_permissions`. También podés tener `user_permissions` para otorgar un permiso extra a un usuario sin crear un rol nuevo.
+## Role Hierarchy and Immutability
 
-**7. En el frontend (Next.js)**  
-Usá un contexto o Zustand con los permisos del usuario (obtenidos del JWT o de un endpoint `/me`). Componentes como `<Can permission="crear_factura">` envuelven los elementos de UI. Recordá que es solo una capa visual; la seguridad real está en el backend.
+- The system is initialized with **system roles** (e.g., `admin`, `user`) that are **immutable** – they cannot be deleted or renamed, though their display names may be updated.
+- Custom roles can be created, modified, and deleted by administrators.
+- The default role for new users is the least‑privileged role (`user`).
 
-**Recomendación para tu ERP**  
-Empezá con **RBAC + permisos** almacenados en BD y viajando en el JWT. Middleware en Go que verifique claims. Si más adelante necesitás reglas por atributos (ej. datos por sucursal), incorporás **Casbin** progresivamente, ya que permite modelar RBAC y luego ABAC sin reescribir todo. Para tu stack, `casbin` con adaptador PostgreSQL encaja bien.
+---
+
+## Permission Definition
+
+- Permissions are **immutable**. They are seeded during system initialization and cannot be modified or deleted at runtime by any user, including administrators.
+- Each permission follows a consistent naming pattern: `{resource}:{action}`.
+- The set of available permissions is fixed and covers all system resources and operations.
+
+---
+
+## Assignment and Management
+
+Administrators with the appropriate permission can:
+
+- Create, update, and delete **custom roles** (system roles are protected).
+- Assign or change a user's role.
+- Modify the set of permissions attached to a role.
+
+Key constraints:
+
+- **System roles** (`admin`, `user`) cannot be deleted.
+- An administrator cannot remove their own `admin` role (prevents accidental lockout).
+- Permissions themselves are **not modifiable** – administrators can only assign/unassign existing permissions.
+
+---
+
+## Enforcement Layers (Defense‑in‑Depth)
+
+Authorization is enforced at **three independent layers** to prevent bypasses:
+
+1. **API Middleware:**
+   - Checks the required permission for the incoming request against the user's cached permission set.
+   - Returns `403 Forbidden` immediately if the permission is missing.
+
+2. **Database Row‑Level Security (RLS):**
+   - Restricts data visibility at the query level (e.g., users see only their own data, unless they have administrative permissions).
+   - Ensures that even if the middleware is bypassed, the database rejects unauthorized reads/writes.
+
+3. **Repository Filtering:**
+   - The application repository layer adds explicit data‑scoping filters (e.g., `AND user_id = $1`) as a final safeguard.
+   - This acts as a defense‑in‑depth measure against misconfigurations in the upper layers.
+
+---
+
+## Permission Caching
+
+- Permissions are **cached** to minimize database load during request processing.
+- The cache is invalidated immediately whenever a user's role changes.
+- Cache lifetime is limited; on cache miss, the system retrieves permissions from the database.
+
+---
+
+## Data Visibility Rules
+
+- By default, users can only access data that belongs to them (their own user record, their own orders, etc.).
+- Users with administrative permissions can access all data, subject to explicit permission checks.
+
+---
+
+## Audit Integration
+
+All role and permission changes are logged in the central audit trail, including:
+
+- Who changed the role.
+- Which user was affected.
+- What the old and new roles were.
+
+For details, see [database-logging.md](./database-logging.md).
+
+---
+
+## References
+
+- [authentication-process.md](./authentication-process.md) – Authentication injects the `user_id` used for permission lookups.
+- [users.md](./users.md) – The user record stores the assigned role.
+- [database-logging.md](./database-logging.md) – Logging of role changes.
+- [soft-delete.md](./soft-delete.md) – Restoring a user does not change their role.
+- [modification-fields.md](./modification-fields.md) – Timestamps for role and permission modifications.
