@@ -47,14 +47,15 @@ func (roleRepositoryImpl) GetUser(ctx context.Context, db Querier) (out models.R
 func (roleRepositoryImpl) Assign(ctx context.Context, db Querier, roleID uuid.UUID, userID uuid.UUID) (err error) {
 	logger := middlewares.GetLogger(ctx)
 
-	rows, err := db.Exec(ctx, queries.AssignRoleToUser, roleID, userID)
+	rows, err := db.Query(ctx, queries.AssignRoleToUser, roleID, userID)
 	if err != nil {
 		logger.ErrorContext(ctx, "creating roles users entry", "error", err)
 		return
 	}
 
-	if rows.RowsAffected() != 1 {
-		// TODO: here should be an error
+	_ , err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[models.RoleUser])
+	if err != nil {
+		logger.ErrorContext(ctx, "collecging role user row", "error", err)
 		return
 	}
 

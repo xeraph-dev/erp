@@ -7,3 +7,8 @@ type Role struct {
 	Name  string    `db:"role_name"`
 	Level int16     `db:"role_level"`
 }
+
+type RoleUser struct {
+	RoleID uuid.UUID `db:"role_id"`
+	UserID uuid.UUID `db:"user_id"`
+}

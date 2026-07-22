@@ -63,6 +63,10 @@ func NewUserFromLoginDTO(ctx context.Context, dto dtos.UserLogin) (model User, e
 	return
 }
 
+func (user User) PasswordMatches(raw string) bool {
+	return user.PasswordHash.Matches(raw)
+}
+
 func (user User) DTO() dtos.User {
 	return dtos.User{
 		ID:        user.ID,

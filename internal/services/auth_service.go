@@ -157,7 +157,7 @@ func (service authServiceImpl) Login(ctx context.Context, in dtos.UserLogin) (ou
 		return
 	}
 
-	if !user.PasswordHash.Matches(in.Password) {
+	if !user.PasswordMatches(in.Password) {
 		err = NewErrUserNotExists(ErrPasswordNotMatch)
 		return
 	}
