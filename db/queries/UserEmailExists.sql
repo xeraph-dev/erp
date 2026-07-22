@@ -1,3 +1,5 @@
-SELECT EXISTS email
-FROM erp.users
-WHERE email = $1;
+SELECT EXISTS (
+    SELECT 1
+    FROM erp.users
+    WHERE email = $1
+);

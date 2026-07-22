@@ -1,3 +1,5 @@
-SELECT EXISTS username
-FROM erp.users
-WHERE username = $1;
+SELECT EXISTS (
+    SELECT 1
+    FROM erp.users
+    WHERE username = $1
+);

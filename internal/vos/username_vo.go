@@ -7,7 +7,7 @@ import (
 
 type Username string
 
-var usernamePattern = regexp.MustCompile(`[a-zA-Z0-9\_\.\-]`)
+var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9\_\.\-]+$`)
 
 var (
 	ErrUsernameTooShort = errors.New("username must be at least 3 characters")

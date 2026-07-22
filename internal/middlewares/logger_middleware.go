@@ -30,7 +30,3 @@ func GetLogger(ctx context.Context) (logger *slog.Logger) {
 	}
 	return
 }
-
-func SetLogger(ctx context.Context, logger *slog.LogValuer) context.Context {
-	return context.WithValue(ctx, loggerKey, logger)
-}

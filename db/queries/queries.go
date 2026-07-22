@@ -22,3 +22,6 @@ var UserEmailExists string
 
 //go:embed GetUserByUsername.sql
 var GetUserByUsername string
+
+//go:embed CreateRefreshToken.sql
+var CreateRefreshToken string

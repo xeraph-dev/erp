@@ -7,7 +7,7 @@ import (
 
 type RoleName string
 
-var roleNamePattern = regexp.MustCompile(`[a-zA-Z0-9\_\.\-]`)
+var roleNamePattern = regexp.MustCompile(`^[a-zA-Z0-9\_\.\-]+$`)
 
 var (
 	ErrRoleNameTooShort = errors.New("role name must be at least 3 characters")

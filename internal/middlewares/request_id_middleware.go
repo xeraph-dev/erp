@@ -15,6 +15,7 @@ func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestID := uuid.New()
 		r.Header.Set(requestIDHeader, requestID.String())
+		w.Header().Set(requestIDHeader, requestID.String())
 
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, requestIDKey, requestID)

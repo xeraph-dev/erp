@@ -42,12 +42,13 @@ func (handler AuthLoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		default:
 			http.Error(w, "internal error", http.StatusInternalServerError)
 		}
+		return
 	}
 
 	http.SetCookie(w, cookie("access_token", pair.AccessToken, pair.AccessTokenExpiresAt))
 	http.SetCookie(w, cookie("refresh_token", pair.RefreshToken, pair.RefreshTokenExpiresAt))
 
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 	if err := codec.Encode(w, pair); err != nil {
 		logger.ErrorContext(ctx, "encoding response body", "error", err)
 	}

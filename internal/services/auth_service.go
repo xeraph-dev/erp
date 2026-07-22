@@ -147,7 +147,7 @@ func (service authServiceImpl) Login(ctx context.Context, in dtos.UserLogin) (ou
 		logger.ErrorContext(ctx, "checking username exists", "error", err)
 		return
 	} else if !exists {
-		err = NewErrUserNotExists(err)
+		err = NewErrUserNotExists(ErrUsernameNotExists)
 		return
 	}
 
@@ -158,7 +158,7 @@ func (service authServiceImpl) Login(ctx context.Context, in dtos.UserLogin) (ou
 	}
 
 	if !user.PasswordHash.Matches(in.Password) {
-		err = NewErrUserNotExists(err)
+		err = NewErrUserNotExists(ErrPasswordNotMatch)
 		return
 	}
 
@@ -210,7 +210,7 @@ func (service authServiceImpl) issueAccessToken(ctx context.Context, userID uuid
 		ExpiresAt: jwt.NewNumericDate(expiresAt),
 	}
 
-	token, err = jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(service.jwtSecret)
+	token, err = jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(service.jwtSecret))
 	if err != nil {
 		logger.ErrorContext(ctx, "signing access token", "error", err)
 		return
