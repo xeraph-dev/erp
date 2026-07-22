@@ -2,15 +2,14 @@ package main
 
 import (
 	"context"
+	"erp/internal/api"
 	"erp/internal/config"
 	"erp/internal/handlers"
 	"erp/internal/middlewares"
 	"erp/internal/repositories"
-	"erp/internal/server"
 	"erp/internal/services"
 	"fmt"
-	"log/slog"
-	"os"
+	"log"
 
 	_ "github.com/caarlos0/env/v10"
 	_ "github.com/go-playground/validator/v10"
@@ -27,50 +26,43 @@ import (
 func main() {
 	ctx := context.Background()
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
 	if err := godotenv.Load(); err != nil {
-		logger.ErrorContext(ctx, "dotenv error", "error", err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
-	config, err := config.New()
+	config, err := config.Load()
 	if err != nil {
-		logger.ErrorContext(ctx, "config error", "error", err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
 	pool, err := pgxpool.New(ctx, config.DatabaseURL)
 	if err != nil {
-		logger.ErrorContext(ctx, "database error", "error", err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 	defer pool.Close()
 
-	server := server.NewServer()
+	addr := fmt.Sprintf(":%d", config.Port)
+	server := api.NewServer(addr)
 
 	server.Use(
-		middlewares.Logger(logger),
 		middlewares.Recoverer,
+		middlewares.Logger(),
 		middlewares.RequestID,
 		middlewares.HTTPLogger,
 		middlewares.Codec,
 	)
 
 	userRepo := repositories.NewUserRepository()
+	roleRepo := repositories.NewRoleRepository()
+	refreshTokenRepo := repositories.NewRefreshTokenRepository()
 
-	userService := services.NewUserService(pool, userRepo)
-	jwtService := services.NewJWTService(config.JWTSecret)
+	authService := services.NewAuthService(config.JWTSecret, pool, userRepo, roleRepo, refreshTokenRepo)
 
-	server.Handle(
-		handlers.NewAuthRegisterHandler(userService, jwtService),
-	)
+	server.Handle(handlers.NewAuthRegisterHandler(authService))
+	server.Handle(handlers.NewAuthLoginHandler(authService))
 
-	addr := fmt.Sprintf(":%d", config.Port)
-	logger.Info("starting server", slog.String("addr", addr))
-	if err := server.Serve(addr); err != nil {
-		logger.Error("server error", "error", err)
-		os.Exit(1)
+	if err := server.Serve(); err != nil {
+		log.Fatal(err)
 	}
-	logger.Info("shutdown complete")
+	log.Println("shutdown complete")
 }

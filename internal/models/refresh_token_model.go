@@ -1,0 +1,24 @@
+package models
+
+import (
+	"erp/internal/vos"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type RefreshToken struct {
+	UserID    uuid.UUID     `db:"user_id"`
+	FamilyID  uuid.UUID     `db:"family_id"`
+	TokenHash vos.TokenHash `db:"token_hash"`
+	ExpiresAt time.Time     `db:"expires_at"`
+}
+
+func NewRefreshToken(userID uuid.UUID, token string, expiresAt time.Time) RefreshToken {
+	return RefreshToken{
+		UserID:    userID,
+		FamilyID:  uuid.New(),
+		TokenHash: vos.NewTokenHash(token),
+		ExpiresAt: expiresAt,
+	}
+}

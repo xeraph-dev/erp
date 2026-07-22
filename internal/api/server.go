@@ -1,10 +1,11 @@
-package server
+package api
 
 import (
 	"context"
 	"erp/internal/handlers"
 	"erp/internal/middlewares"
 	"errors"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,13 +14,15 @@ import (
 )
 
 type Server struct {
+	addr        string
 	mux         *http.ServeMux
 	middlewares []middlewares.Middleware
 }
 
 var _ Router = (*Server)(nil)
 
-func NewServer() (server Server) {
+func NewServer(addr string) (server Server) {
+	server.addr = addr
 	server.mux = http.NewServeMux()
 	return
 }
@@ -36,19 +39,31 @@ func (server *Server) Handle(handlers ...handlers.Handler) {
 	}
 }
 
-func (server *Server) Group(groupFunc func(g *Group)) {
+func (server *Server) Group(groupFunc func(group *Group)) {
 	group := NewGroup(server.mux)
-	groupFunc(&group)
+	groupFunc(group)
 	group.Chain()
 }
-func (server *Server) Serve(addr string) error {
+
+func (server *Server) Route(pattern string, groupFunc func(group *Group)) {
+	group := NewGroup(server.mux)
+	group.rootPattern = pattern
+	groupFunc(group)
+	group.Chain()
+}
+
+func (server *Server) Serve() error {
 	httpServer := &http.Server{
-		Addr:    addr,
-		Handler: server.chain(),
+		Addr:         server.addr,
+		Handler:      server.chain(),
+		WriteTimeout: 10 * time.Second,
+		ReadTimeout:  30 * time.Second,
+		IdleTimeout:  1 * time.Minute,
 	}
 
 	errCh := make(chan error, 1)
 	go func() {
+		log.Printf("starting server at %s", server.addr)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}

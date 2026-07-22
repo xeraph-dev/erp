@@ -6,13 +6,8 @@ import (
 	"erp/internal/dtos"
 	"erp/internal/middlewares"
 	"erp/internal/vos"
-	"errors"
 
 	"github.com/google/uuid"
-)
-
-var (
-	ErrGeneratingPassword = errors.New("failed generating password")
 )
 
 type User struct {
@@ -29,18 +24,19 @@ func NewUserFromRegisterDTO(ctx context.Context, dto dtos.UserRegister) (model U
 
 	username, err := vos.NewUsername(dto.Username)
 	if err != nil {
+		logger.ErrorContext(ctx, "validating username", "error", err)
 		return
 	}
 
-	passwordHash, err := vos.NewPasswordHash(ctx, dto.Password)
+	passwordHash, err := vos.NewPasswordHash(dto.Password)
 	if err != nil {
 		logger.ErrorContext(ctx, "hashing password", "error", err)
-		err = ErrGeneratingPassword
 		return
 	}
 
 	email, err := vos.NewEmail(dto.Email)
 	if err != nil {
+		logger.ErrorContext(ctx, "validating email", "error", err)
 		return
 	}
 
@@ -53,9 +49,12 @@ func NewUserFromRegisterDTO(ctx context.Context, dto dtos.UserRegister) (model U
 	return
 }
 
-func NewUserFromLoginDTO(dto dtos.UserLogin) (model User, err error) {
+func NewUserFromLoginDTO(ctx context.Context, dto dtos.UserLogin) (model User, err error) {
+	logger := middlewares.GetLogger(ctx)
+
 	username, err := vos.NewUsername(dto.Username)
 	if err != nil {
+		logger.ErrorContext(ctx, "validating username", "error", err)
 		return
 	}
 	model = User{

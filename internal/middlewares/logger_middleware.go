@@ -4,11 +4,15 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"os"
 )
 
 const loggerKey = "logger"
 
-func Logger(logger *slog.Logger) Middleware {
+func Logger() Middleware {
+	// TODO: handler logger target via config
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -19,8 +23,12 @@ func Logger(logger *slog.Logger) Middleware {
 	}
 }
 
-func GetLogger(ctx context.Context) *slog.Logger {
-	return ctx.Value(loggerKey).(*slog.Logger)
+func GetLogger(ctx context.Context) (logger *slog.Logger) {
+	logger, ok := ctx.Value(loggerKey).(*slog.Logger)
+	if !ok {
+		logger = slog.Default()
+	}
+	return
 }
 
 func SetLogger(ctx context.Context, logger *slog.LogValuer) context.Context {

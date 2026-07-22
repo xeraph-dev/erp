@@ -11,8 +11,8 @@ var usernamePattern = regexp.MustCompile(`[a-zA-Z0-9\_\.\-]`)
 
 var (
 	ErrUsernameTooShort = errors.New("username must be at least 3 characters")
-	ErrUsernameTooLong  = errors.New("username must not expceed 32 characters")
-	ErrUsernameInvalid  = errors.New("username must contain only alphanumeric, underscore, period and dash characters")
+	ErrUsernameTooLong  = errors.New("username must not exceed 32 characters")
+	ErrUsernameInvalid  = errors.New("username must contain only alphanumeric characteres, underscore, period and dash")
 )
 
 func NewUsername(raw string) (username Username, err error) {

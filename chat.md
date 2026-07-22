@@ -409,3 +409,529 @@ None of this is urgent — the interface design (sealed via `__internal()`, clea
 Want me to look at the middleware chain or the `services`/`repositories` layers next, or focus on the codecs fix first?
 
 ---
+
+**give me an explanation about access token and refresh token**
+
+---
+
+
+Here's a JWT implementation fitting your layered architecture.
+
+## Claims and token generation
+
+```go
+// internal/vos/token_vos.go
+package vos
+
+import (
+	"errors"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+)
+
+var (
+	ErrInvalidToken = errors.New("invalid token")
+	ErrExpiredToken = errors.New("expired token")
+)
+
+type AccessClaims struct {
+	jwt.RegisteredClaims
+	UserID uuid.UUID `json:"uid"`
+}
+
+const (
+	accessTokenTTL  = 15 * time.Minute
+	refreshTokenTTL = 7 * 24 * time.Hour
+)
+
+func NewAccessToken(userID uuid.UUID, secret []byte) (signed string, err error) {
+	claims := AccessClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(accessTokenTTL)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+		UserID: userID,
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(secret)
+}
+
+func ParseAccessToken(raw string, secret []byte) (claims AccessClaims, err error) {
+	token, err := jwt.ParseWithClaims(raw, &claims, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, ErrInvalidToken
+		}
+		return secret, nil
+	})
+	if err != nil {
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			err = ErrExpiredToken
+			return
+		}
+		err = ErrInvalidToken
+		return
+	}
+	if !token.Valid {
+		err = ErrInvalidToken
+	}
+	return
+}
+```
+
+Note: the refresh token is **not** a JWT here — it's a random opaque string, stored server-side so it can be revoked. This is the recommendation from before.
+
+```go
+// internal/vos/refresh_token_vos.go
+package vos
+
+import (
+	"crypto/rand"
+	"encoding/base64"
+)
+
+type RefreshToken string
+
+func NewRefreshToken() (RefreshToken, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return RefreshToken(base64.RawURLEncoding.EncodeToString(b)), nil
+}
+```
+
+## Model + repository
+
+```go
+// internal/models/refresh_token_model.go
+package models
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type RefreshToken struct {
+	ID        uuid.UUID  `db:"id"`
+	UserID    uuid.UUID  `db:"user_id"`
+	TokenHash string     `db:"token_hash"` // store a hash, not the raw token
+	ExpiresAt time.Time  `db:"expires_at"`
+	RevokedAt *time.Time `db:"revoked_at"`
+}
+```
+
+Store a SHA-256 hash of the refresh token, not the raw value — same principle as password hashing, so a DB leak doesn't hand out valid sessions directly.
+
+## Service layer
+
+```go
+// internal/services/auth_service.go
+package services
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+
+	"erp/internal/dtos"
+	"erp/internal/middlewares"
+	"erp/internal/models"
+	"erp/internal/repositories"
+	"erp/internal/vos"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+var (
+	ErrRefreshTokenInvalid = errors.New("invalid or expired refresh token")
+)
+
+type AuthService interface {
+	Service
+	Login(ctx context.Context, in dtos.UserLogin) (out dtos.TokenPair, err error)
+	Refresh(ctx context.Context, rawRefresh string) (out dtos.TokenPair, err error)
+	Logout(ctx context.Context, rawRefresh string) (err error)
+}
+
+type authServiceImpl struct {
+	db            *pgxpool.Pool
+	users         repositories.UserRepository
+	refreshTokens repositories.RefreshTokenRepository
+	jwtSecret     []byte
+}
+
+func (service authServiceImpl) __internal() {}
+
+func hashToken(raw string) string {
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:])
+}
+
+func (service authServiceImpl) issuePair(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (out dtos.TokenPair, err error) {
+	access, err := vos.NewAccessToken(userID, service.jwtSecret)
+	if err != nil {
+		return
+	}
+
+	rawRefresh, err := vos.NewRefreshToken()
+	if err != nil {
+		return
+	}
+
+	_, err = service.refreshTokens.Create(ctx, tx, models.RefreshToken{
+		UserID:    userID,
+		TokenHash: hashToken(string(rawRefresh)),
+		ExpiresAt: time.Now().Add(vos.RefreshTokenTTL),
+	})
+	if err != nil {
+		return
+	}
+
+	out = dtos.TokenPair{AccessToken: access, RefreshToken: string(rawRefresh)}
+	return
+}
+
+func (service authServiceImpl) Login(ctx context.Context, in dtos.UserLogin) (out dtos.TokenPair, err error) {
+	logger := middlewares.GetLogger(ctx)
+	model := models.NewUserFromLoginDTO(in)
+
+	err = withTx(ctx, service.db, func(tx pgx.Tx) (err error) {
+		user, err := service.users.GetByName(ctx, tx, model)
+		if err != nil {
+			return err
+		}
+		if !user.PasswordHash.Matches(in.Password) {
+			return ErrIncorrectUserPassword
+		}
+
+		out, err = service.issuePair(ctx, tx, user.ID)
+		return err
+	})
+	if err != nil {
+		logger.ErrorContext(ctx, "login failed", "error", err)
+	}
+	return
+}
+
+func (service authServiceImpl) Refresh(ctx context.Context, rawRefresh string) (out dtos.TokenPair, err error) {
+	hash := hashToken(rawRefresh)
+
+	err = withTx(ctx, service.db, func(tx pgx.Tx) (err error) {
+		stored, err := service.refreshTokens.GetValidByHash(ctx, tx, hash)
+		if errors.Is(err, repositories.ErrNotFound) {
+			return ErrRefreshTokenInvalid
+		} else if err != nil {
+			return err
+		}
+
+		// rotation: revoke old, issue new
+		if err = service.refreshTokens.Revoke(ctx, tx, stored.ID); err != nil {
+			return err
+		}
+
+		out, err = service.issuePair(ctx, tx, stored.UserID)
+		return err
+	})
+	return
+}
+
+func (service authServiceImpl) Logout(ctx context.Context, rawRefresh string) (err error) {
+	hash := hashToken(rawRefresh)
+	return withTx(ctx, service.db, func(tx pgx.Tx) error {
+		return service.refreshTokens.RevokeByHash(ctx, tx, hash)
+	})
+}
+```
+
+## Middleware for verifying access tokens
+
+```go
+// internal/middlewares/auth_middleware.go
+package middlewares
+
+import (
+	"context"
+	"net/http"
+
+	"erp/internal/vos"
+
+	"github.com/google/uuid"
+)
+
+const userIDKey = "user-id"
+
+func Auth(secret []byte) Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			raw := r.Header.Get("Authorization")
+			raw = strings.TrimPrefix(raw, "Bearer ")
+			if raw == "" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			claims, err := vos.ParseAccessToken(raw, secret)
+			if err != nil {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
+			ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func GetUserID(ctx context.Context) uuid.UUID {
+	return ctx.Value(userIDKey).(uuid.UUID)
+}
+```
+
+## Key design points
+
+- **Access token is stateless**: `ParseAccessToken` never hits the DB, so verification stays fast on every request.
+- **Refresh token is opaque and stored hashed**: gives you a revocation point without weakening the access-token performance benefit.
+- **Rotation on refresh**: each `Refresh` call invalidates the old refresh token and issues a new one. If a revoked token is reused, that's a strong signal of theft — worth revoking the entire session family (all tokens tied to that user/device) rather than just logging the anomaly.
+- **`GetUserID`** in middleware mirrors your existing `GetLogger`/`GetCodec` context pattern, keeping the auth middleware consistent with the rest of your stdlib-based design.
+
+Want the `RefreshTokenRepository` implementation and the corresponding migration file next?
+
+
+---
+
+**dame una guia de como usar el modulo jwt**
+
+---
+
+## Guía práctica: golang-jwt/jwt/v5
+
+### Instalación
+
+```bash
+go get github.com/golang-jwt/jwt/v5
+```
+
+### Conceptos básicos
+
+El módulo trabaja con tres piezas:
+- **Claims**: los datos que va dentro del token (quién es el usuario, cuándo expira, etc.)
+- **Signing method**: el algoritmo de firma (HMAC, RSA, ECDSA...)
+- **Token**: la estructura que combina claims + firma
+
+### 1. Definir tus claims
+
+Puedes usar `jwt.RegisteredClaims` (los campos estándar del spec: `exp`, `iat`, `sub`, etc.) y extenderlo con tus propios campos:
+
+```go
+type AccessClaims struct {
+	jwt.RegisteredClaims
+	UserID uuid.UUID `json:"uid"`
+	Role   string    `json:"role,omitempty"`
+}
+```
+
+Los campos estándar más usados de `RegisteredClaims`:
+
+| Campo | JSON | Propósito |
+|---|---|---|
+| `ExpiresAt` | `exp` | Cuándo expira |
+| `IssuedAt` | `iat` | Cuándo se emitió |
+| `NotBefore` | `nbf` | No válido antes de esta fecha |
+| `Subject` | `sub` | Identificador del sujeto (opcional, si no usas campo custom) |
+| `ID` | `jti` | ID único del token (útil para blocklists) |
+
+### 2. Firmar (generar) un token
+
+```go
+claims := AccessClaims{
+	RegisteredClaims: jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+	},
+	UserID: userID,
+}
+
+token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+signed, err := token.SignedString([]byte(secretKey))
+```
+
+`SignedString` acepta distintos tipos según el algoritmo:
+- HMAC (`HS256/384/512`) → `[]byte`
+- RSA (`RS256`...) → `*rsa.PrivateKey`
+- ECDSA (`ES256`...) → `*ecdsa.PrivateKey`
+
+Para tu caso (monolito, un solo servicio verificando), **HMAC es suficiente y más simple** — no necesitas el par de llaves pública/privada que justifica RSA/ECDSA (eso tiene sentido cuando otro servicio necesita *verificar* sin poder *firmar*).
+
+### 3. Parsear y validar un token
+
+```go
+func ParseAccessToken(raw string, secret []byte) (claims AccessClaims, err error) {
+	token, err := jwt.ParseWithClaims(raw, &claims, func(t *jwt.Token) (any, error) {
+		// valida que el algoritmo sea el esperado (evita ataques de "alg confusion")
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return secret, nil
+	})
+	if err != nil {
+		return
+	}
+	if !token.Valid {
+		err = errors.New("invalid token")
+	}
+	return
+}
+```
+
+Puntos clave:
+- La función callback (`Keyfunc`) recibe el token *antes* de validarlo, para que decidas qué llave usar según el `alg` — por eso **siempre** se verifica el signing method dentro del callback, nunca se asume.
+- `jwt.ParseWithClaims` valida automáticamente `exp` y `nbf` si están presentes.
+
+### 4. Manejar errores específicos
+
+```go
+token, err := jwt.ParseWithClaims(raw, &claims, keyFunc)
+if err != nil {
+	switch {
+	case errors.Is(err, jwt.ErrTokenExpired):
+		// el token expiró — el cliente debe usar el refresh token
+	case errors.Is(err, jwt.ErrTokenMalformed):
+		// el token está corrupto o mal formado
+	case errors.Is(err, jwt.ErrTokenSignatureInvalid):
+		// la firma no coincide — posible manipulación
+	default:
+		// otro error de validación
+	}
+}
+```
+
+Distinguir `ErrTokenExpired` del resto es importante en tu flujo: un token expirado es un caso normal (activa el refresh), mientras que una firma inválida es sospechoso y debería loguearse como tal.
+
+### 5. Opciones de validación adicionales
+
+```go
+token, err := jwt.ParseWithClaims(raw, &claims, keyFunc,
+	jwt.WithValidMethods([]string{"HS256"}),        // refuerza el algoritmo permitido
+	jwt.WithLeeway(30*time.Second),                  // tolerancia de reloj
+	jwt.WithIssuer("erp-api"),                       // valida el campo iss
+)
+```
+
+`WithValidMethods` es una capa extra de seguridad (además del check dentro del `Keyfunc`) — recomendable si vas a exponer el sistema a más de un tipo de cliente en el futuro.
+
+### 6. Aplicado a tu arquitectura
+
+En tu `vos` package esto encapsula bien la invariante "un access token válido siempre tiene un `UserID` y no está expirado":
+
+```go
+// internal/vos/token_vos.go — value object, sin lógica de negocio externa
+func NewAccessToken(userID uuid.UUID, secret []byte) (string, error) { ... }
+func ParseAccessToken(raw string, secret []byte) (AccessClaims, error) { ... }
+```
+
+Y la capa de `middlewares` es quien lo consume, siguiendo el mismo patrón que ya usas con `GetLogger`/`GetCodec`:
+
+```go
+claims, err := vos.ParseAccessToken(raw, secret)
+if err != nil { /* 401 */ }
+ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
+```
+
+### Resumen de buenas prácticas
+
+- Nunca confíes en el `alg` del header sin validarlo explícitamente en el `Keyfunc`
+- Guarda el `secret` en config (vos ya usan `caarlos0/env`), nunca hardcodeado
+- Usa `RegisteredClaims` como base — te da `exp`/`iat` gratis con la validación correcta
+- Para el refresh token, no uses JWT (como vimos antes) — usa un token opaco almacenado en DB, para poder revocarlo
+
+¿Quieres que arme el ejemplo del middleware completo con extracción del header `Authorization` y manejo de los distintos casos de error?
+
+---
+
+**que es keyfunc**
+
+---
+
+## Keyfunc
+
+`Keyfunc` es el tipo de la función callback que le pasas a `jwt.ParseWithClaims` (o `jwt.Parse`) para que le diga a la librería **qué llave usar para verificar la firma** del token.
+
+```go
+type Keyfunc func(*Token) (interface{}, error)
+```
+
+### Por qué existe
+
+La librería no puede saber de antemano qué llave usar — depende del token. Entonces el flujo es:
+
+1. La librería decodifica el **header** del JWT (sin validar nada todavía)
+2. Te pasa el `*jwt.Token` parcialmente decodificado a tu `Keyfunc`
+3. Tu función mira ese token (típicamente el campo `alg`, o a veces `kid` — key ID) y decide qué llave devolver
+4. La librería usa esa llave para verificar la firma
+
+```go
+keyFunc := func(t *jwt.Token) (interface{}, error) {
+    // t.Method te dice qué algoritmo dice el header que usó
+    if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+        return nil, errors.New("unexpected signing method")
+    }
+    return secret, nil // esta es la llave que se usará para verificar
+}
+
+token, err := jwt.ParseWithClaims(raw, &claims, keyFunc)
+```
+
+### Por qué siempre hay que validar el algoritmo dentro
+
+Esto es el punto más importante del `Keyfunc`, no un detalle opcional. Existe un ataque clásico llamado **"algorithm confusion"**: si tu API pública fuera RSA (`RS256`) y firmaras el token con la llave privada, un atacante podría:
+
+1. Tomar el token válido
+2. Cambiar el header a `alg: HS256`
+3. Firmarlo con la llave *pública* (que es conocida) como si fuera un secreto HMAC
+
+Si tu `Keyfunc` no verifica que el algoritmo sea el esperado antes de devolver la llave, la librería aceptaría esa firma falsa como válida — porque técnicamente "coincide" con lo que le diste.
+
+Por eso el patrón correcto es siempre:
+
+```go
+func(t *jwt.Token) (interface{}, error) {
+    if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+        return nil, errors.New("unexpected signing method")
+    }
+    return secret, nil
+}
+```
+
+En vez de simplemente:
+
+```go
+func(t *jwt.Token) (interface{}, error) {
+    return secret, nil // ❌ nunca verifica el alg — vulnerable
+}
+```
+
+### Cuándo el Keyfunc necesita más lógica
+
+Si en algún momento rotas llaves de firma (por ejemplo, cambias el secreto cada cierto tiempo por seguridad), el `Keyfunc` es también el lugar donde resolverías eso, normalmente usando el claim `kid` (key ID) del header para buscar la llave correcta en un mapa o almacén de llaves:
+
+```go
+func(t *jwt.Token) (interface{}, error) {
+    kid, ok := t.Header["kid"].(string)
+    if !ok {
+        return nil, errors.New("missing kid")
+    }
+    key, ok := keyStore[kid]
+    if !ok {
+        return nil, errors.New("unknown key")
+    }
+    return key, nil
+}
+```
+
+Para tu caso actual (un solo secreto HMAC, sin rotación), la versión simple con el chequeo de `alg` es suficiente.

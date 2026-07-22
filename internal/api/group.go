@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"erp/internal/handlers"
@@ -7,6 +7,7 @@ import (
 )
 
 type Group struct {
+	rootPattern string
 	mux         *http.ServeMux
 	middlewares []middlewares.Middleware
 	handlers    []handlers.Handler
@@ -14,8 +15,16 @@ type Group struct {
 
 var _ Router = (*Group)(nil)
 
-func NewGroup(mux *http.ServeMux) (group Group) {
+func NewGroup(mux *http.ServeMux) (group *Group) {
+	group = new(Group)
 	group.mux = mux
+	return
+}
+
+func NewGroupWithMiddlewares(mux *http.ServeMux, baseMiddlewares []middlewares.Middleware) (group *Group) {
+	group = NewGroup(mux)
+	group.middlewares = make([]middlewares.Middleware, len(baseMiddlewares))
+	copy(group.middlewares, baseMiddlewares)
 	return
 }
 
@@ -29,11 +38,16 @@ func (group *Group) Handle(handlers ...handlers.Handler) {
 	group.handlers = append(group.handlers, handlers...)
 }
 
-func (group *Group) Group(groupFunc func(g *Group)) {
-	ng := NewGroup(group.mux)
-	ng.middlewares = make([]middlewares.Middleware, len(group.middlewares))
-	copy(ng.middlewares, group.middlewares)
-	groupFunc(&ng)
+func (group *Group) Group(groupFunc func(group *Group)) {
+	ng := NewGroupWithMiddlewares(group.mux, group.middlewares)
+	groupFunc(ng)
+	ng.Chain()
+}
+
+func (group *Group) Route(pattern string, groupFunc func(group *Group)) {
+	ng := NewGroupWithMiddlewares(group.mux, group.middlewares)
+	ng.rootPattern += pattern
+	groupFunc(ng)
 	ng.Chain()
 }
 

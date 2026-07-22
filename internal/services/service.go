@@ -16,14 +16,13 @@ func withTx(ctx context.Context, db *pgxpool.Pool, txFunc func(tx pgx.Tx) (err e
 	if err != nil {
 		return
 	}
-	defer tx.Commit(ctx)
+	defer func() {
+		if err != nil {
+			tx.Rollback(ctx)
+			return
+		}
+		err = tx.Commit(ctx)
+	}()
 
-	// repositories.SetCurrentUserID(ctx, tx, )
-
-	if err = txFunc(tx); err != nil {
-		tx.Rollback(ctx)
-		return
-	}
-
-	return
+	return txFunc(tx)
 }

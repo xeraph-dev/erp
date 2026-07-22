@@ -1,3 +1,10 @@
+DROP TRIGGER IF EXISTS soft_delete_roles ON erp.roles;
+DROP FUNCTION IF EXISTS erp.soft_delete_roles;
+
+
+DROP VIEW IF EXISTS erp.roles;
+
+
 DROP TRIGGER IF EXISTS update_modification_fields ON erp.roles_table;
 
 

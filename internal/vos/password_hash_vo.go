@@ -1,8 +1,6 @@
 package vos
 
 import (
-	"context"
-	"erp/internal/middlewares"
 	"errors"
 
 	"golang.org/x/crypto/bcrypt"
@@ -14,12 +12,9 @@ var (
 	ErrPasswordTooShort   = errors.New("password must be at least 8 characters")
 	ErrPasswordTooLong    = errors.New("password must not exceed 72 characters")
 	ErrPasswordWeak       = errors.New("password must has at least one lowercase character, one uppercase character, one digit, and one special symbol")
-	ErrGeneratingPassword = errors.New("generating password")
 )
 
-func NewPasswordHash(ctx context.Context, raw string) (hash PasswordHash, err error) {
-	logger := middlewares.GetLogger(ctx)
-
+func NewPasswordHash(raw string) (hash PasswordHash, err error) {
 	var lower bool
 	var upper bool
 	var digit bool
@@ -49,8 +44,7 @@ func NewPasswordHash(ctx context.Context, raw string) (hash PasswordHash, err er
 		var password []byte
 		password, err = bcrypt.GenerateFromPassword([]byte(raw), bcrypt.DefaultCost)
 		if err != nil {
-			logger.ErrorContext(ctx, "generating password", "error", err)
-			err = ErrGeneratingPassword
+			return
 		} else {
 			hash = PasswordHash(password)
 		}

@@ -5,8 +5,20 @@ import _ "embed"
 //go:embed CreateUser.sql
 var CreateUser string
 
-//go:embed GetUserByName.sql
-var GetUserByName string
-
 //go:embed SetCurrentUserID.sql
 var SetCurrentUserID string
+
+//go:embed GetRoleUser.sql
+var GetRoleUser string
+
+//go:embed AssignRoleToUser.sql
+var AssignRoleToUser string
+
+//go:embed UsernameExists.sql
+var UsernameExists string
+
+//go:embed UserEmailExists.sql
+var UserEmailExists string
+
+//go:embed GetUserByUsername.sql
+var GetUserByUsername string

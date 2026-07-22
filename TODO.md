@@ -20,3 +20,14 @@
   - errors in vos package should be returned outside the models layer?
   - errors in repository layer should be returned outside the service layer?
 - [ ] implement head and options methods
+- [ ] allow only the used methods and headers
+- [ ] add idempotent key for actions to prevent duplication
+- [ ] add resource's (created|updated|deleted)_at fields in the corresponding HTTP Header
+- [ ] read about the HTTP Header `Content-Disposition`
+- [ ] implement jwt service
+- [ ] implement access and refresh token
+- [ ] complete the implemention of **login**, **register**, **forgot-password** handlers
+- [ ] download paper  **Architectural Styles adn the Design of Network-based Software Architectures** by **Roy Thomas Fielding**
+- [ ] add api versioning
+- [ ] implement translations using the header `Accept-Language`
+- [ ] implement middleware for automatic response body compression and request body decompression
