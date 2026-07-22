@@ -7,7 +7,6 @@ import (
 )
 
 type Group struct {
-	rootPattern string
 	mux         *http.ServeMux
 	middlewares []middlewares.Middleware
 	handlers    []handlers.Handler
@@ -40,13 +39,6 @@ func (group *Group) Handle(handlers ...handlers.Handler) {
 
 func (group *Group) Group(groupFunc func(group *Group)) {
 	ng := NewGroupWithMiddlewares(group.mux, group.middlewares)
-	groupFunc(ng)
-	ng.Chain()
-}
-
-func (group *Group) Route(pattern string, groupFunc func(group *Group)) {
-	ng := NewGroupWithMiddlewares(group.mux, group.middlewares)
-	ng.rootPattern += pattern
 	groupFunc(ng)
 	ng.Chain()
 }

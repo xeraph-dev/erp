@@ -45,13 +45,6 @@ func (server *Server) Group(groupFunc func(group *Group)) {
 	group.Chain()
 }
 
-func (server *Server) Route(pattern string, groupFunc func(group *Group)) {
-	group := NewGroup(server.mux)
-	group.rootPattern = pattern
-	groupFunc(group)
-	group.Chain()
-}
-
 func (server *Server) Serve() error {
 	httpServer := &http.Server{
 		Addr:         server.addr,
