@@ -82,8 +82,7 @@ func (authServiceImpl) __internal() {}
 func (service authServiceImpl) Register(ctx context.Context, in dtos.UserRegister) (out dtos.TokenPair, err error) {
 	model, err := models.NewUserFromRegisterDTO(in)
 	if err != nil {
-		err = fmt.Errorf("creating model: %w", err)
-		// err = NewErrCreatingUserModel(err)
+		err = NewErrCreatingUserModel(err)
 		return
 	}
 
@@ -101,8 +100,7 @@ func (service authServiceImpl) Register(ctx context.Context, in dtos.UserRegiste
 		err = fmt.Errorf("checking user email exists: %w", err)
 		return
 	} else if exists {
-		err = ErrUserEmailExists
-		// err = NewErrUserExists(ErrUserEmailExists)
+		err = NewErrUserExists(ErrUserEmailExists)
 		return
 	}
 
@@ -139,8 +137,7 @@ func (service authServiceImpl) Register(ctx context.Context, in dtos.UserRegiste
 func (service authServiceImpl) Login(ctx context.Context, in dtos.UserLogin) (out dtos.TokenPair, err error) {
 	model, err := models.NewUserFromLoginDTO(in)
 	if err != nil {
-		err = fmt.Errorf("creating model: %w", err)
-		// err = NewErrCreatingUserModel(err)
+		err = NewErrCreatingUserModel(err)
 		return
 	}
 
@@ -149,8 +146,7 @@ func (service authServiceImpl) Login(ctx context.Context, in dtos.UserLogin) (ou
 		err = fmt.Errorf("checking username exists: %w", err)
 		return
 	} else if !exists {
-		err = ErrUsernameNotExists
-		// err = NewErrUserNotExists(ErrUsernameNotExists)
+		err = NewErrUserNotExists(ErrUsernameNotExists)
 		return
 	}
 
@@ -161,7 +157,7 @@ func (service authServiceImpl) Login(ctx context.Context, in dtos.UserLogin) (ou
 	}
 
 	if !user.PasswordMatches(in.Password) {
-		err = ErrPasswordNotMatch
+		err = NewErrUserNotExists(ErrPasswordNotMatch)
 		return
 	}
 
