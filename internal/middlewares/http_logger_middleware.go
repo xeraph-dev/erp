@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 )
 
 type responseWriterWrapper struct {
@@ -30,8 +31,12 @@ func HTTPLogger(next http.Handler) http.Handler {
 			slog.String("addr", r.RemoteAddr),
 			slog.String("method", r.Method),
 			slog.String("uri", r.RequestURI))
+		start := time.Now()
 		defer func() {
-			logger.InfoContext(ctx, "exiting request", "status", fmt.Sprintf("%d %s", wrapper.statusCode, http.StatusText(wrapper.statusCode)))
+			logger.InfoContext(ctx, "exiting request",
+				slog.String("status", fmt.Sprintf("%d %s", wrapper.statusCode, http.StatusText(wrapper.statusCode))),
+				slog.Duration("time", time.Since(start)),
+			)
 		}()
 
 		next.ServeHTTP(wrapper, r)
