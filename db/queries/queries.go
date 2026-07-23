@@ -31,3 +31,6 @@ var GetRefreshTokenByTokenHash string
 
 //go:embed RevokeRefreshToken.sql
 var RevokeRefreshToken string
+
+//go:embed RevokeRefreshTokenFamily.sql
+var RevokeRefreshTokenFamily string

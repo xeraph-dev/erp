@@ -53,7 +53,7 @@ type AuthService interface {
 	Service
 	Register(ctx context.Context, in dtos.UserRegister) (out dtos.TokenPair, err error)
 	Login(ctx context.Context, in dtos.UserLogin) (out dtos.TokenPair, err error)
-	Logout(ctx context.Context, userID uuid.UUID) (err error)
+	Logout(ctx context.Context, refreshToken string) (err error)
 	Refresh(ctx context.Context, refreshToken string) (out dtos.TokenPair, err error)
 }
 
@@ -174,7 +174,23 @@ func (service authServiceImpl) Login(ctx context.Context, in dtos.UserLogin) (ou
 	return
 }
 
-func (service authServiceImpl) Logout(ctx context.Context, userID uuid.UUID) (err error) {
+func (service authServiceImpl) Logout(ctx context.Context, refreshToken string) (err error) {
+	refresh, err := service.refresh.GetByTokenHash(ctx, service.db, vos.NewTokenHash(refreshToken))
+	if err != nil {
+		if errors.Is(err, repositories.ErrRefreshTokenNotFound) {
+			err = ErrRefreshTokenNotFound
+			return
+		}
+		err = fmt.Errorf("getting refresh token by token hash: %w", err)
+		return
+	}
+
+	_, err = service.refresh.RevokeFamily(ctx, service.db, refresh)
+	if err != nil {
+		err = fmt.Errorf("revoking refresh token family: %w", err)
+		return
+	}
+
 	return
 }
 

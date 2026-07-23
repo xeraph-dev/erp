@@ -43,3 +43,8 @@ func setAuthCookies(w http.ResponseWriter, pair dtos.TokenPair) {
 	http.SetCookie(w, cookie("access_token", pair.AccessToken, pair.AccessTokenExpiresAt))
 	http.SetCookie(w, cookie("refresh_token", pair.RefreshToken, pair.RefreshTokenExpiresAt))
 }
+
+func clearAuthCookies(w http.ResponseWriter) {
+	http.SetCookie(w, cookie("access_token", "", time.Unix(0, 0)))
+	http.SetCookie(w, cookie("refresh_token", "", time.Unix(0, 0)))
+}

@@ -20,6 +20,7 @@ type RefreshTokenRepository interface {
 	Create(ctx context.Context, db Querier, in models.RefreshToken) (out models.RefreshToken, err error)
 	GetByTokenHash(ctx context.Context, db Querier, tokenHash vos.TokenHash) (out models.RefreshToken, err error)
 	Revoke(ctx context.Context, db Querier, in models.RefreshToken) (out models.RefreshToken, err error)
+	RevokeFamily(ctx context.Context, db Querier, in models.RefreshToken) (out []models.RefreshToken, err error)
 }
 
 type refreshTokenRepositoryImpl struct{}
@@ -82,6 +83,27 @@ func (repo refreshTokenRepositoryImpl) Revoke(ctx context.Context, db Querier, i
 			return
 		}
 		err = fmt.Errorf("collecting refresh token row: %w", err)
+		return
+	}
+
+	return
+}
+
+func (repo refreshTokenRepositoryImpl) RevokeFamily(ctx context.Context, db Querier, in models.RefreshToken) (out []models.RefreshToken, err error) {
+	rows, err := db.Query(ctx, queries.RevokeRefreshToken)
+	if err != nil {
+		err = fmt.Errorf("updating refresh token: %w", err)
+		return
+	}
+
+	out, err = pgx.CollectRows(rows, pgx.RowToStructByName[models.RefreshToken])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			err = ErrRefreshTokenNotFound
+			return
+		}
+		err = fmt.Errorf("collecting refresh token row: %w", err)
+		return
 	}
 
 	return
