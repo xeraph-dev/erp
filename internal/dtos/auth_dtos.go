@@ -20,10 +20,16 @@ type TokenPair struct {
 	RefreshTokenExpiresAt time.Time `json:"-" xml:"-"`
 }
 
+type RefreshToken struct {
+	RefreshToken string `json:"refresh_token" xml:"refresh_token"`
+}
+
 var _ DTO = (*UserLogin)(nil)
 var _ DTO = (*UserRegister)(nil)
 var _ DTO = (*TokenPair)(nil)
+var _ DTO = (*RefreshToken)(nil)
 
-func (UserLogin) __internal()     {}
-func (UserRegister) __internal()  {}
-func (TokenPair) __internal() {}
+func (UserLogin) __internal()    {}
+func (UserRegister) __internal() {}
+func (TokenPair) __internal()    {}
+func (RefreshToken) __internal() {}

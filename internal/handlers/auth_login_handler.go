@@ -4,6 +4,7 @@ import (
 	"erp/internal/dtos"
 	"erp/internal/middlewares"
 	"erp/internal/services"
+	"errors"
 	"net/http"
 )
 
@@ -13,7 +14,7 @@ type AuthLoginHandler struct {
 
 var _ Handler = (*AuthLoginHandler)(nil)
 
-func NewAuthLoginHandler(auth services.AuthService) AuthLoginHandler {
+func NewAuthLoginHandler(auth services.AuthService) Handler {
 	return AuthLoginHandler{auth: auth}
 }
 
@@ -34,9 +35,9 @@ func (handler AuthLoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	pair, err := handler.auth.Login(ctx, dto)
 	if err != nil {
 		logger.ErrorContext(ctx, "logging in user", "error", err)
-		switch v := err.(type) {
+		switch err.(type) {
 		case services.ErrCreatingUserModel:
-			http.Error(w, v.Unwrap().Error(), http.StatusUnprocessableEntity)
+			http.Error(w, errors.Unwrap(err).Error(), http.StatusUnprocessableEntity)
 		case services.ErrUserNotExists:
 			http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		default:
@@ -45,8 +46,7 @@ func (handler AuthLoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	http.SetCookie(w, cookie("access_token", pair.AccessToken, pair.AccessTokenExpiresAt))
-	http.SetCookie(w, cookie("refresh_token", pair.RefreshToken, pair.RefreshTokenExpiresAt))
+	setAuthCookies(w, pair)
 
 	w.WriteHeader(http.StatusOK)
 	if err := codec.Encode(w, pair); err != nil {

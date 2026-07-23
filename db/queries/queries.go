@@ -25,3 +25,9 @@ var GetUserByUsername string
 
 //go:embed CreateRefreshToken.sql
 var CreateRefreshToken string
+
+//go:embed GetRefreshTokenByTokenHash.sql
+var GetRefreshTokenByTokenHash string
+
+//go:embed RevokeRefreshToken.sql
+var RevokeRefreshToken string

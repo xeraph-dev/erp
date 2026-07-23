@@ -29,5 +29,9 @@ func RequestID(next http.Handler) http.Handler {
 }
 
 func GetRequestID(ctx context.Context) uuid.UUID {
-	return ctx.Value(requestIDKey).(uuid.UUID)
+	id, ok := ctx.Value(requestIDKey).(uuid.UUID)
+	if !ok {
+		id = uuid.Nil
+	}
+	return id
 }

@@ -59,6 +59,7 @@ func main() {
 
 	server.Handle(handlers.NewAuthRegisterHandler(authService))
 	server.Handle(handlers.NewAuthLoginHandler(authService))
+	server.Handle(handlers.NewAuthRefreshHandler(authService))
 
 	if err := server.Serve(); err != nil {
 		log.Fatal(err)

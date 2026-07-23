@@ -7,22 +7,25 @@ type Codec struct {
 	encoder Encoder
 }
 
+var DefaultCodec, _ = NewCodec("", "")
+
 func NewCodec(contentType string, accept string) (codec Codec, ok bool) {
+	ok = true
 	switch contentType {
-	case "application/json":
+	case "", "application/json":
 		codec.decoder = jsonDecoder{}
 	case "application/xml", "text/xml":
 		codec.decoder = xmlDecoder{}
 	default:
-		codec.decoder = jsonDecoder{}
+		ok = false
 	}
 	switch accept {
-	case "application/json":
+	case "", "application/json":
 		codec.encoder = jsonEncoder{}
 	case "application/xml", "text/xml":
 		codec.encoder = jsonEncoder{}
 	default:
-		codec.encoder = jsonEncoder{}
+		ok = false
 	}
 	return
 }

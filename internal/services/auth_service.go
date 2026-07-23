@@ -7,6 +7,7 @@ import (
 	"erp/internal/middlewares"
 	"erp/internal/models"
 	"erp/internal/repositories"
+	"erp/internal/vos"
 	"errors"
 	"fmt"
 	"time"
@@ -23,10 +24,11 @@ const (
 )
 
 var (
-	ErrUsernameExists    = errors.New("username already exists")
-	ErrUserEmailExists   = errors.New("user email already exists")
-	ErrUsernameNotExists = errors.New("username does not exists")
-	ErrPasswordNotMatch  = errors.New("user password does not match")
+	ErrUsernameExists       = errors.New("username already exists")
+	ErrUserEmailExists      = errors.New("user email already exists")
+	ErrUsernameNotExists    = errors.New("username does not exists")
+	ErrPasswordNotMatch     = errors.New("user password does not match")
+	ErrRefreshTokenNotFound = errors.New("refresh token not found")
 )
 
 type ErrCreatingUserModel struct{ err error }
@@ -40,16 +42,20 @@ func NewErrUserNotExists(err error) ErrUserNotExists         { return ErrUserNot
 func (err ErrCreatingUserModel) Unwrap() error { return err.err }
 func (err ErrUserExists) Unwrap() error        { return err.err }
 func (err ErrUserNotExists) Unwrap() error     { return err.err }
-func (err ErrCreatingUserModel) Error() string { return fmt.Sprintf("creating model: %s", err.err.Error()) }
-func (err ErrUserExists) Error() string        { return fmt.Sprintf("user exists: %s", err.err.Error()) }
-func (err ErrUserNotExists) Error() string     { return fmt.Sprintf("user not exists: %s", err.err.Error()) }
+func (err ErrCreatingUserModel) Error() string {
+	return fmt.Sprintf("creating model: %s", err.err.Error())
+}
+func (err ErrUserExists) Error() string { return fmt.Sprintf("user exists: %s", err.err.Error()) }
+func (err ErrUserNotExists) Error() string {
+	return fmt.Sprintf("user not exists: %s", err.err.Error())
+}
 
 type AuthService interface {
 	Service
 	Register(ctx context.Context, in dtos.UserRegister) (out dtos.TokenPair, err error)
 	Login(ctx context.Context, in dtos.UserLogin) (out dtos.TokenPair, err error)
-	// Logout(ctx context.Context, id uuid.UUID) (err error)
-	// Refresh(ctx context.Context, refreshToken string) (out dtos.TokenPair, err error)
+	Logout(ctx context.Context, userID uuid.UUID) (err error)
+	Refresh(ctx context.Context, refreshToken string) (out dtos.TokenPair, err error)
 }
 
 type authServiceImpl struct {
@@ -171,21 +177,54 @@ func (service authServiceImpl) Login(ctx context.Context, in dtos.UserLogin) (ou
 	return
 }
 
-func (service authServiceImpl) issueTokenPair(ctx context.Context, db repositories.Querier, userID uuid.UUID) (out dtos.TokenPair, err error) {
-	logger := middlewares.GetLogger(ctx)
+func (service authServiceImpl) Logout(ctx context.Context, userID uuid.UUID) (err error) {
+	return
+}
 
+func (service authServiceImpl) Refresh(ctx context.Context, refreshToken string) (out dtos.TokenPair, err error) {
+	refresh, err := service.refresh.GetByTokenHash(ctx, service.db, vos.NewTokenHash(refreshToken))
+	if err != nil {
+		if errors.Is(err, repositories.ErrRefreshTokenNotFound) {
+			err = ErrRefreshTokenNotFound
+			return
+		}
+		err = fmt.Errorf("getting refresh token by token hash: %w", err)
+		return
+	}
+
+	if err = withTx(ctx, service.db, func(tx pgx.Tx) (err error) {
+		refresh, err := service.refresh.Revoke(ctx, tx, refresh)
+		if err != nil {
+			err = fmt.Errorf("revoking refresh token: %w", err)
+			return
+		}
+
+		out, err = service.issueTokenPairInFamily(ctx, service.db, refresh.UserID, refresh.FamilyID)
+		if err != nil {
+			err = fmt.Errorf("issuing token pair: %w", err)
+			return
+		}
+		return
+	}); err != nil {
+		return
+	}
+
+	return
+}
+
+func (service authServiceImpl) issueTokenPairInFamily(ctx context.Context, db repositories.Querier, userID uuid.UUID, familyID uuid.UUID) (out dtos.TokenPair, err error) {
 	accessToken, accessTokenExpiresAt, err := service.issueAccessToken(ctx, userID)
 	if err != nil {
-		logger.ErrorContext(ctx, "issuing access token", "error", err)
+		err = fmt.Errorf("issuing access token: %w", err)
 		return
 	}
 
 	refreshToken, refreshTokenExpiresAt := service.issueRefreshToken()
 
-	model := models.NewRefreshToken(userID, refreshToken, refreshTokenExpiresAt)
+	model := models.NewRefreshToken(userID, familyID, refreshToken, refreshTokenExpiresAt)
 
-	if err = service.refresh.Create(ctx, db, model); err != nil {
-		logger.ErrorContext(ctx, "creating refresh token entry", "error", err)
+	if _, err = service.refresh.Create(ctx, db, model); err != nil {
+		err = fmt.Errorf("creating refresh token entry: %w", err)
 		return
 	}
 
@@ -198,16 +237,22 @@ func (service authServiceImpl) issueTokenPair(ctx context.Context, db repositori
 	return
 }
 
+func (service authServiceImpl) issueTokenPair(ctx context.Context, db repositories.Querier, userID uuid.UUID) (out dtos.TokenPair, err error) {
+	return service.issueTokenPairInFamily(ctx, db, userID, uuid.New())
+}
+
 func (service authServiceImpl) issueAccessToken(ctx context.Context, userID uuid.UUID) (token string, expiresAt time.Time, err error) {
 	logger := middlewares.GetLogger(ctx)
 
-	expiresAt = time.Now().Add(accessTokenTTL)
+	now := time.Now()
+	expiresAt = now.Add(accessTokenTTL)
 
 	claims := jwt.RegisteredClaims{
 		ID:        uuid.NewString(),
 		Subject:   userID.String(),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		ExpiresAt: jwt.NewNumericDate(expiresAt),
+		IssuedAt:  jwt.NewNumericDate(now),
+		NotBefore: jwt.NewNumericDate(now),
 	}
 
 	token, err = jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(service.jwtSecret))

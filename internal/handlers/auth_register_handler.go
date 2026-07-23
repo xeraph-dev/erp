@@ -35,19 +35,18 @@ func (handler AuthRegisterHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 	pair, err := handler.auth.Register(ctx, dto)
 	if err != nil {
 		logger.ErrorContext(ctx, "registering user", "error", err)
-		switch v := err.(type) {
+		switch err.(type) {
 		case services.ErrCreatingUserModel:
-			http.Error(w, errors.Unwrap(v).Error(), http.StatusUnprocessableEntity)
+			http.Error(w, errors.Unwrap(err).Error(), http.StatusUnprocessableEntity)
 		case services.ErrUserExists:
-			http.Error(w, errors.Unwrap(v).Error(), http.StatusConflict)
+			http.Error(w, errors.Unwrap(err).Error(), http.StatusConflict)
 		default:
 			http.Error(w, "internal error", http.StatusInternalServerError)
 		}
 		return
 	}
 
-	http.SetCookie(w, cookie("access_token", pair.AccessToken, pair.AccessTokenExpiresAt))
-	http.SetCookie(w, cookie("refresh_token", pair.RefreshToken, pair.RefreshTokenExpiresAt))
+	setAuthCookies(w, pair)
 
 	w.WriteHeader(http.StatusCreated)
 	if err := codec.Encode(w, pair); err != nil {

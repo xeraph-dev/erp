@@ -52,5 +52,9 @@ func Codec(next http.Handler) http.Handler {
 }
 
 func GetCodec(ctx context.Context) codecs.Codec {
-	return ctx.Value(codecKey).(codecs.Codec)
+	codec, ok := ctx.Value(codecKey).(codecs.Codec)
+	if !ok {
+		codec = codecs.DefaultCodec
+	}
+	return codec
 }
