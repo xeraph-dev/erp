@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"erp/internal/dtos"
-	"erp/internal/middlewares"
 	"erp/internal/models"
 	"erp/internal/repositories"
 	"erp/internal/vos"
@@ -81,18 +80,16 @@ func NewAuthService(jwtSecret string, db *pgxpool.Pool, users repositories.UserR
 func (authServiceImpl) __internal() {}
 
 func (service authServiceImpl) Register(ctx context.Context, in dtos.UserRegister) (out dtos.TokenPair, err error) {
-	logger := middlewares.GetLogger(ctx)
-
-	model, err := models.NewUserFromRegisterDTO(ctx, in)
+	model, err := models.NewUserFromRegisterDTO(in)
 	if err != nil {
-		logger.ErrorContext(ctx, "creating model", "error", err)
-		err = NewErrCreatingUserModel(err)
+		err = fmt.Errorf("creating model: %w", err)
+		// err = NewErrCreatingUserModel(err)
 		return
 	}
 
 	exists, err := service.user.UsernameExists(ctx, service.db, model.Username)
 	if err != nil {
-		logger.ErrorContext(ctx, "checking username exists", "error", err)
+		err = fmt.Errorf("checking username exists: %w", err)
 		return
 	} else if exists {
 		err = NewErrUserExists(ErrUsernameExists)
@@ -101,34 +98,35 @@ func (service authServiceImpl) Register(ctx context.Context, in dtos.UserRegiste
 
 	exists, err = service.user.EmailExists(ctx, service.db, model.Email)
 	if err != nil {
-		logger.ErrorContext(ctx, "checking user email exists", "error", err)
+		err = fmt.Errorf("checking user email exists: %w", err)
 		return
 	} else if exists {
-		err = NewErrUserExists(ErrUserEmailExists)
+		err = ErrUserEmailExists
+		// err = NewErrUserExists(ErrUserEmailExists)
 		return
 	}
 
 	err = withTx(ctx, service.db, func(tx pgx.Tx) (err error) {
 		user, err := service.user.Create(ctx, tx, model)
 		if err != nil {
-			logger.ErrorContext(ctx, "creating entry", "error", err)
+			err = fmt.Errorf("creating entry: %w", err)
 			return
 		}
 
 		role, err := service.role.GetUser(ctx, tx)
 		if err != nil {
-			logger.ErrorContext(ctx, "getting role user", "error", err)
+			err = fmt.Errorf("getting role user: %w", err)
 			return
 		}
 
 		if err = service.role.Assign(ctx, tx, role.ID, user.ID); err != nil {
-			logger.ErrorContext(ctx, "assigning role to user", "role_id", role.ID, "user_id", user.ID)
+			err = fmt.Errorf("assigning role %s to user %s: %w", role.ID, user.ID, err)
 			return
 		}
 
 		out, err = service.issueTokenPair(ctx, tx, user.ID)
 		if err != nil {
-			logger.ErrorContext(ctx, "issuing token pair", "error", err)
+			err = fmt.Errorf("issuing token pair: %w", err)
 			return
 		}
 
@@ -139,38 +137,37 @@ func (service authServiceImpl) Register(ctx context.Context, in dtos.UserRegiste
 }
 
 func (service authServiceImpl) Login(ctx context.Context, in dtos.UserLogin) (out dtos.TokenPair, err error) {
-	logger := middlewares.GetLogger(ctx)
-
-	model, err := models.NewUserFromLoginDTO(ctx, in)
+	model, err := models.NewUserFromLoginDTO(in)
 	if err != nil {
-		logger.ErrorContext(ctx, "creating model", "error", err)
-		err = NewErrCreatingUserModel(err)
+		err = fmt.Errorf("creating model: %w", err)
+		// err = NewErrCreatingUserModel(err)
 		return
 	}
 
 	exists, err := service.user.UsernameExists(ctx, service.db, model.Username)
 	if err != nil {
-		logger.ErrorContext(ctx, "checking username exists", "error", err)
+		err = fmt.Errorf("checking username exists: %w", err)
 		return
 	} else if !exists {
-		err = NewErrUserNotExists(ErrUsernameNotExists)
+		err = ErrUsernameNotExists
+		// err = NewErrUserNotExists(ErrUsernameNotExists)
 		return
 	}
 
 	user, err := service.user.GetByUsername(ctx, service.db, model.Username)
 	if err != nil {
-		logger.ErrorContext(ctx, "getting user by username", "error", err)
+		err = fmt.Errorf("getting user by username: %w", err)
 		return
 	}
 
 	if !user.PasswordMatches(in.Password) {
-		err = NewErrUserNotExists(ErrPasswordNotMatch)
+		err = ErrPasswordNotMatch
 		return
 	}
 
 	out, err = service.issueTokenPair(ctx, service.db, user.ID)
 	if err != nil {
-		logger.ErrorContext(ctx, "issuing token pair", "error", err)
+		err = fmt.Errorf("issuing token pair: %w", err)
 		return
 	}
 
@@ -242,8 +239,6 @@ func (service authServiceImpl) issueTokenPair(ctx context.Context, db repositori
 }
 
 func (service authServiceImpl) issueAccessToken(ctx context.Context, userID uuid.UUID) (token string, expiresAt time.Time, err error) {
-	logger := middlewares.GetLogger(ctx)
-
 	now := time.Now()
 	expiresAt = now.Add(accessTokenTTL)
 
@@ -257,7 +252,7 @@ func (service authServiceImpl) issueAccessToken(ctx context.Context, userID uuid
 
 	token, err = jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(service.jwtSecret))
 	if err != nil {
-		logger.ErrorContext(ctx, "signing access token", "error", err)
+		err = fmt.Errorf("signing access token: %w", err)
 		return
 	}
 

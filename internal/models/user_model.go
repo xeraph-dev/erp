@@ -1,11 +1,10 @@
 package models
 
 import (
-	"context"
 	"database/sql"
 	"erp/internal/dtos"
-	"erp/internal/middlewares"
 	"erp/internal/vos"
+	"fmt"
 
 	"github.com/google/uuid"
 )
@@ -19,24 +18,22 @@ type User struct {
 	LastName     sql.NullString   `db:"last_name"`
 }
 
-func NewUserFromRegisterDTO(ctx context.Context, dto dtos.UserRegister) (model User, err error) {
-	logger := middlewares.GetLogger(ctx)
-
+func NewUserFromRegisterDTO(dto dtos.UserRegister) (model User, err error) {
 	username, err := vos.NewUsername(dto.Username)
 	if err != nil {
-		logger.ErrorContext(ctx, "validating username", "error", err)
+		err = fmt.Errorf("validating username: %w", err)
 		return
 	}
 
 	passwordHash, err := vos.NewPasswordHash(dto.Password)
 	if err != nil {
-		logger.ErrorContext(ctx, "hashing password", "error", err)
+		err = fmt.Errorf("hashing password: %w", err)
 		return
 	}
 
 	email, err := vos.NewEmail(dto.Email)
 	if err != nil {
-		logger.ErrorContext(ctx, "validating email", "error", err)
+		err = fmt.Errorf("validating email: %w", err)
 		return
 	}
 
@@ -49,12 +46,10 @@ func NewUserFromRegisterDTO(ctx context.Context, dto dtos.UserRegister) (model U
 	return
 }
 
-func NewUserFromLoginDTO(ctx context.Context, dto dtos.UserLogin) (model User, err error) {
-	logger := middlewares.GetLogger(ctx)
-
+func NewUserFromLoginDTO(dto dtos.UserLogin) (model User, err error) {
 	username, err := vos.NewUsername(dto.Username)
 	if err != nil {
-		logger.ErrorContext(ctx, "validating username", "error", err)
+		err = fmt.Errorf("validating username: %w", err)
 		return
 	}
 	model = User{

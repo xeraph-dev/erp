@@ -3,8 +3,8 @@ package repositories
 import (
 	"context"
 	"erp/db/queries"
-	"erp/internal/middlewares"
 	"erp/internal/models"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -27,17 +27,15 @@ func NewRoleRepository() RoleRepository {
 func (roleRepositoryImpl) __internal() {}
 
 func (roleRepositoryImpl) GetUser(ctx context.Context, db Querier) (out models.Role, err error) {
-	logger := middlewares.GetLogger(ctx)
-
 	rows, err := db.Query(ctx, queries.GetRoleUser)
 	if err != nil {
-		logger.ErrorContext(ctx, "quering role user", "error", err)
+		err = fmt.Errorf("quering role user: %w", err)
 		return
 	}
 
 	out, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[models.Role])
 	if err != nil {
-		logger.ErrorContext(ctx, "collecting role user", "error", err)
+		err = fmt.Errorf("collecting role user: %w", err)
 		return
 	}
 
@@ -45,17 +43,15 @@ func (roleRepositoryImpl) GetUser(ctx context.Context, db Querier) (out models.R
 }
 
 func (roleRepositoryImpl) Assign(ctx context.Context, db Querier, roleID uuid.UUID, userID uuid.UUID) (err error) {
-	logger := middlewares.GetLogger(ctx)
-
 	rows, err := db.Query(ctx, queries.AssignRoleToUser, roleID, userID)
 	if err != nil {
-		logger.ErrorContext(ctx, "creating roles users entry", "error", err)
+		err = fmt.Errorf("creating roles users entry: %w", err)
 		return
 	}
 
-	_ , err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[models.RoleUser])
+	_, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[models.RoleUser])
 	if err != nil {
-		logger.ErrorContext(ctx, "collecging role user row", "error", err)
+		err = fmt.Errorf("collecging role user row: %w", err)
 		return
 	}
 
