@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,15 +11,13 @@ import (
 )
 
 type Server struct {
-	addr        string
 	mux         *http.ServeMux
 	middlewares []Middleware
 }
 
 var _ Router = (*Server)(nil)
 
-func NewServer(addr string) (server Server) {
-	server.addr = addr
+func NewServer() (server Server) {
 	server.mux = http.NewServeMux()
 	return
 }
@@ -43,9 +40,10 @@ func (server *Server) Group(groupFunc func(group *Group)) {
 	group.Chain()
 }
 
-func (server *Server) Serve() error {
+func (server *Server) Serve(addr string) error {
+
 	httpServer := &http.Server{
-		Addr:         server.addr,
+		Addr:         addr,
 		Handler:      server.chain(),
 		WriteTimeout: 10 * time.Second,
 		ReadTimeout:  30 * time.Second,
@@ -54,7 +52,6 @@ func (server *Server) Serve() error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Printf("starting server at %s\n", server.addr)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}

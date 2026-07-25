@@ -5,12 +5,22 @@ import (
 	"net/http"
 )
 
+type Encoder interface {
+	__internal()
+	ContentType() string
+	Encode(r io.Writer, v any) error
+}
+
+type Decoder interface {
+	__internal()
+	ContentType() string
+	Decode(w io.Reader, v any) error
+}
+
 type Codec struct {
 	decoder Decoder
 	encoder Encoder
 }
-
-var DefaultCodec, _ = NewCodec("application/json", "application/json")
 
 func NewCodec(contentType string, accept string) (codec Codec, ok bool) {
 	ok = true
@@ -32,20 +42,15 @@ func NewCodec(contentType string, accept string) (codec Codec, ok bool) {
 	}
 	return
 }
+
+func Default() Codec {
+	codec, _ := NewCodec("application/json", "application/json")
+	return codec
+}
+
 func (codec Codec) Decode(r *http.Request, v any) error { return codec.decoder.Decode(r.Body, v) }
+
 func (codec Codec) Encode(w http.ResponseWriter, v any) error {
 	w.Header().Set("Content-Type", codec.encoder.ContentType())
 	return codec.encoder.Encode(w, v)
-}
-
-type Encoder interface {
-	__internal()
-	ContentType() string
-	Encode(r io.Writer, v any) error
-}
-
-type Decoder interface {
-	__internal()
-	ContentType() string
-	Decode(w io.Reader, v any) error
 }

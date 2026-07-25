@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -26,15 +27,21 @@ func main() {
 		log.Fatal(err)
 	}
 
+	logger := slog.New(config.LogHandler())
+
 	pool, err := pgxpool.New(ctx, config.DatabaseURL)
 	if err != nil {
-		log.Fatal(err)
+		logger.ErrorContext(ctx, "creating database pooler", "error", err)
+		os.Exit(1)
 	}
-	_ = pool
+	defer pool.Close()
 
-	server := api.NewServer(fmt.Sprintf(":%d", config.Port))
+	if err := pool.Ping(ctx); err != nil {
+		logger.ErrorContext(ctx, "checking database connection", "error", err)
+		os.Exit(1)
+	}
 
-	logger := slog.New(config.LogHandler())
+	server := api.NewServer()
 
 	server.Use(
 		middlewares.Recoverer,
@@ -48,8 +55,11 @@ func main() {
 		handlers.NewHealthHandler(),
 	)
 
-	if err := server.Serve(); err != nil {
-		log.Fatal(err)
+	addr := fmt.Sprintf(":%d", config.Port)
+	logger.InfoContext(ctx, "starting server", slog.String("addr", addr))
+	defer logger.InfoContext(ctx, "shutdown complete")
+
+	if err := server.Serve(addr); err != nil {
+		logger.ErrorContext(ctx, "starting server", "error", err)
 	}
-	log.Println("shutdown complete")
 }

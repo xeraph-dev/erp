@@ -48,5 +48,5 @@ func GetCodec(ctx context.Context) codecs.Codec {
 	if codec, ok := ctx.Value(codecKey).(codecs.Codec); ok {
 		return codec
 	}
-	return codecs.DefaultCodec
+	return codecs.Default()
 }
