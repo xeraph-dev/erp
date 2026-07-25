@@ -2,6 +2,7 @@ package stores
 
 import (
 	_ "embed"
+	"errors"
 
 	"context"
 	"erp/internal/auth/models"
@@ -10,6 +11,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+)
+
+const userLayer = "stores/User"
+
+var (
+	ErrUserNotFound   = errors.New("user not found")
+	ErrUsernameTaken  = errors.New("username already taken")
+	ErrUserEmailTaken = errors.New("email already taken")
 )
 
 type User interface {
@@ -32,84 +42,65 @@ func NewUser() User {
 var getUserByID string
 
 func (store userImpl) GetByID(ctx context.Context, q db.Querier, id uuid.UUID) (out models.User, err error) {
-	rows, err := q.Query(ctx, getUserByID, id)
-	if err != nil {
-		return
-	}
-
-	out, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[models.User])
-	if err != nil {
-		return
-	}
-
-	return
+	return db.QueryExactlyOneRow[models.User](userLayer+".GetByID", getUserByID, pgx.StrictNamedArgs{
+		"id": id,
+	}, ctx, q, store.translate)
 }
 
 //go:embed queries/get_user_by_username.sql
 var getUserByUsername string
 
 func (store userImpl) GetByUsername(ctx context.Context, q db.Querier, username vos.Username) (out models.User, err error) {
-	rows, err := q.Query(ctx, getUserByUsername, username)
-	if err != nil {
-		return
-	}
-
-	out, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[models.User])
-	if err != nil {
-		return
-	}
-
-	return
+	return db.QueryExactlyOneRow[models.User](userLayer+".GetByUsername", getUserByID, pgx.StrictNamedArgs{
+		"username": username,
+	}, ctx, q, store.translate)
 }
 
 //go:embed queries/get_user_by_email.sql
 var getUserByEmail string
 
 func (store userImpl) GetByEmail(ctx context.Context, q db.Querier, email vos.Email) (out models.User, err error) {
-	rows, err := q.Query(ctx, getUserByEmail, email)
-	if err != nil {
-		return
-	}
-
-	out, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[models.User])
-	if err != nil {
-		return
-	}
-
-	return
+	return db.QueryExactlyOneRow[models.User](userLayer+".GetByEmail", getUserByID, pgx.StrictNamedArgs{
+		"email": email,
+	}, ctx, q, store.translate)
 }
 
 //go:embed queries/create_user.sql
 var createUser string
 
 func (store userImpl) Create(ctx context.Context, q db.Querier, in models.User) (out models.User, err error) {
-	rows, err := q.Query(ctx, createUser, in.Username, in.Email, in.PasswordHash, in.FirstName, in .LastName)
-	if err != nil {
-		return
-	}
-
-	out, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[models.User])
-	if err != nil {
-		return
-	}
-
-	return
+	return db.QueryExactlyOneRow[models.User](userLayer+".Create", getUserByID, pgx.StrictNamedArgs{
+		"username":      in.Username,
+		"email":         in.Email,
+		"password_hash": in.PasswordHash,
+		"first_name":    in.FirstName,
+		"last_name":     in.LastName,
+	}, ctx, q, store.translate)
 }
-
 
 //go:embed queries/delete_user_by_id.sql
 var deleteUserByID string
 
 func (store userImpl) DeleteByID(ctx context.Context, q db.Querier, id uuid.UUID) (out models.User, err error) {
-	rows, err := q.Query(ctx, deleteUserByID, id)
-	if err != nil {
-		return
+	return db.QueryExactlyOneRow[models.User](userLayer+".DeleteByID", getUserByID, pgx.StrictNamedArgs{
+		"id": id,
+	}, ctx, q, store.translate)
+}
+
+func (store userImpl) translate(err error) error {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrUserNotFound
 	}
 
-	out, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[models.User])
-	if err != nil {
-		return
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		switch pgErr.ConstraintName {
+		case "active_users_username_idx":
+			return ErrUsernameTaken
+		case "active_users_email_idx":
+			return ErrUserEmailTaken
+		}
 	}
 
-	return
+	return err
 }

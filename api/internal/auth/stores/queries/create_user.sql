@@ -1,3 +1,3 @@
 INSERT INTO auth.users (username, email, password_hash, first_name, last_name)
-VALUES ($1, $2, $3)
+VALUES (@username, @email, @password_hash, @first_name, @last_name)
 RETURNING id, username, email password_hash, first_name, last_name;

@@ -2,6 +2,7 @@ package stores
 
 import (
 	_ "embed"
+	"errors"
 
 	"context"
 	"erp/internal/auth/models"
@@ -10,6 +11,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+)
+
+const refreshTokenLayer = "stores/RefreshToken"
+
+var (
+	ErrRefreshTokenNotFound = errors.New("refresh token not found")
 )
 
 type RefreshToken interface {
@@ -49,66 +56,42 @@ func (store refreshTokenImpl) Create(ctx context.Context, q db.Querier, in model
 var getRefreshTokenByHash string
 
 func (store refreshTokenImpl) GetByHash(ctx context.Context, q db.Querier, hash vos.TokenHash) (out models.RefreshToken, err error) {
-	rows, err := q.Query(ctx, getRefreshTokenByHash, hash)
-	if err != nil {
-		return
-	}
-
-	out, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[models.RefreshToken])
-	if err != nil {
-		return
-	}
-
-	return
+	return db.QueryExactlyOneRow[models.RefreshToken](refreshTokenLayer+".GetByHash", getRefreshTokenByHash, pgx.StrictNamedArgs{
+		"token_hash": hash,
+	}, ctx, q, store.translate)
 }
 
 //go:embed queries/get_refresh_tokens_family_id.sql
 var getRefreshTokensByFamilyID string
 
-func (store refreshTokenImpl) GetByFamilyID(ctx context.Context, q db.Querier, id uuid.UUID) (out []models.RefreshToken, err error) {
-	rows, err := q.Query(ctx, getRefreshTokensByFamilyID, id)
-	if err != nil {
-		return
-	}
-
-	out, err = pgx.CollectRows(rows, pgx.RowToStructByName[models.RefreshToken])
-	if err != nil {
-		return
-	}
-
-	return
+func (store refreshTokenImpl) GetByFamilyID(ctx context.Context, q db.Querier, familyID uuid.UUID) (out []models.RefreshToken, err error) {
+	return db.QueryRows[models.RefreshToken](refreshTokenLayer+".GetByFamilyID", getRefreshTokensByFamilyID, pgx.StrictNamedArgs{
+		"family_id": familyID,
+	}, ctx, q, store.translate)
 }
 
 //go:embed queries/revoke_refresh_token_by_hash.sql
 var revokeRefreshTokenByHash string
 
 func (store refreshTokenImpl) RevokeByHash(ctx context.Context, q db.Querier, hash vos.TokenHash) (out models.RefreshToken, err error) {
-	rows, err := q.Query(ctx, revokeRefreshTokenByHash, hash)
-	if err != nil {
-		return
-	}
-
-	out, err = pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[models.RefreshToken])
-	if err != nil {
-		return
-	}
-
-	return
+	return db.QueryExactlyOneRow[models.RefreshToken](refreshTokenLayer+".RevokeByHash", revokeRefreshTokenByHash, pgx.StrictNamedArgs{
+		"token_hash": hash,
+	}, ctx, q, store.translate)
 }
 
 //go:embed queries/revoke_refresh_tokens_by_family_id.sql
 var revokeRefreshTokensByFamilyID string
 
-func (store refreshTokenImpl) RevokeByFamilyID(ctx context.Context, q db.Querier, id uuid.UUID) (out []models.RefreshToken, err error) {
-	rows, err := q.Query(ctx, revokeRefreshTokensByFamilyID, id)
-	if err != nil {
-		return
+func (store refreshTokenImpl) RevokeByFamilyID(ctx context.Context, q db.Querier, familyID uuid.UUID) (out []models.RefreshToken, err error) {
+	return db.QueryRows[models.RefreshToken](refreshTokenLayer+".RevokeByFamilyID", revokeRefreshTokensByFamilyID, pgx.StrictNamedArgs{
+		"family_id": familyID,
+	}, ctx, q, store.translate)
+}
+
+func (store refreshTokenImpl) translate(err error) error {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrRefreshTokenNotFound
 	}
 
-	out, err = pgx.CollectRows(rows, pgx.RowToStructByName[models.RefreshToken])
-	if err != nil {
-		return
-	}
-
-	return
+	return err
 }
