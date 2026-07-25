@@ -68,7 +68,7 @@ func (user User) PasswordMatches(raw string) bool {
 
 func (user User) DTO() dtos.User {
 	return dtos.User{
-		ID:        user.ID.String(),
+		ID:        user.ID,
 		Username:  user.Username.String(),
 		Email:     user.Email.String(),
 		FirstName: user.FirstName.String,
