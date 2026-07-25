@@ -1,9 +1,9 @@
 CREATE TABLE IF NOT EXISTS auth.__users (
-    id              UUID    PRIMARY KEY DEFAULT uuidv4(),
+    id              UUID    PRIMARY KEY DEFAULT uuidv7(),
 
-    username        TEXT    UNIQUE  NOT NULL,
-    email           TEXT    UNIQUE  NOT NULL,
-    password_hash   TEXT            NOT NULL,
+    username        TEXT    NOT NULL,
+    email           TEXT    NOT NULL,
+    password_hash   TEXT    NOT NULL,
 
     first_name      TEXT,
     last_name       TEXT,
