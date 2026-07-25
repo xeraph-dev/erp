@@ -24,6 +24,10 @@ type userImpl struct{}
 
 var _ User = (*userImpl)(nil)
 
+func NewUser() User {
+	return userImpl{}
+}
+
 //go:embed queries/get_user_by_id.sql
 var getUserByID string
 
