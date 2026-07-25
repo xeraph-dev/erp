@@ -15,3 +15,12 @@ type RefreshToken struct {
 	ExpiresAt time.Time     `db:"expires_at"`
 	RevokedAt sql.NullTime  `db:"revoked_at"`
 }
+
+func NewRefreshToken(token string, userID, familyID uuid.UUID, expiresAt time.Time) RefreshToken {
+	return RefreshToken{
+		TokenHash: vos.NewTokenHash(token),
+		UserID:    userID,
+		FamilyID:  familyID,
+		ExpiresAt: expiresAt,
+	}
+}
