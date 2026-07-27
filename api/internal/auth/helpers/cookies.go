@@ -14,7 +14,7 @@ func cookie(name string, value string, expiresAt time.Time) *http.Cookie {
 		Name:     name,
 		Value:    value,
 		Expires:  expiresAt,
-		Path:     "/api/auth",
+		Path:     "/",
 		SameSite: http.SameSiteStrictMode,
 		HttpOnly: true,
 		Secure:   true,

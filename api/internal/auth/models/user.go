@@ -43,25 +43,6 @@ func NewUserFromRegisterDTO(dto dtos.UserRegister) (model User, err error) {
 	}, nil
 }
 
-func NewUserFromLoginDTO(dto dtos.UserLogin) (model User, err error) {
-	const op = "models/NewUserFromLoginDTO"
-
-	username, err := vos.NewUsername(dto.Username)
-	if err != nil {
-		return model, fmt.Errorf("%s: %w", op, err)
-	}
-
-	passwordHash, err := vos.NewPasswordHash(dto.Password)
-	if err != nil {
-		return model, fmt.Errorf("%s: %w", op, err)
-	}
-
-	return User{
-		Username:     username,
-		PasswordHash: passwordHash,
-	}, nil
-}
-
 func (user User) PasswordMatches(raw string) bool {
 	return user.PasswordHash.Matches(raw)
 }

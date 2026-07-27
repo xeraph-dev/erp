@@ -80,12 +80,13 @@ func (service authImpl) Register(ctx context.Context, in dtos.UserRegister) (out
 }
 
 func (service authImpl) Login(ctx context.Context, in dtos.UserLogin) (out tokens.Pair, err error) {
-	model, err := models.NewUserFromLoginDTO(in)
+	username, err := vos.NewUsername(in.Username)
 	if err != nil {
-		return out, fmt.Errorf("%w: %w", ErrValidationFailed, err)
+		dummyPasswordHash.Matches(in.Password)
+		return out, fmt.Errorf("%w: %w", ErrInvalidCredentials, err)
 	}
 
-	user, err := service.user.GetByUsername(ctx, service.db, model.Username)
+	user, err := service.user.GetByUsername(ctx, service.db, username)
 	if err != nil {
 		dummyPasswordHash.Matches(in.Password)
 		return out, fmt.Errorf("%w: %w", ErrInvalidCredentials, err)

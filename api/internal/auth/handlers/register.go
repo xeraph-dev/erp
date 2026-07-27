@@ -26,8 +26,10 @@ func Register(auth services.Auth) http.HandlerFunc {
 			switch {
 			case errors.Is(err, services.ErrRecordConflict):
 				http.Error(w, err.Error(), http.StatusConflict)
+				return
 			case errors.Is(err, services.ErrValidationFailed):
 				http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+				return
 			default:
 				logger.ErrorContext(ctx, "register failed", "error", err)
 				http.Error(w, "internal server error", http.StatusInternalServerError)

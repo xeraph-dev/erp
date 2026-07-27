@@ -15,6 +15,7 @@ var _ Router = (*Group)(nil)
 func NewGroup(mux *http.ServeMux) (group *Group) {
 	group = new(Group)
 	group.mux = mux
+	group.handlers = make(map[string]http.Handler)
 	return
 }
 

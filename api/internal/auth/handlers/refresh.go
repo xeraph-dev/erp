@@ -25,6 +25,7 @@ func Refresh(auth services.Auth) http.HandlerFunc {
 			case errors.Is(err, services.ErrInvalidCredentials):
 				helpers.ClearAuthCookies(w)
 				http.Error(w, "invalid refresh token", http.StatusUnauthorized)
+				return
 			default:
 				http.Error(w, "internal server error", http.StatusInternalServerError)
 				return
