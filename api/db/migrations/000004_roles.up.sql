@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS auth.__roles (
     role_name       TEXT        NOT NULL,
     role_level      SMALLINT    NOT NULL,
 
-
     created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at      TIMESTAMP WITH TIME ZONE,
