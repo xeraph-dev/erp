@@ -5,3 +5,13 @@ CREATE TABLE IF NOT EXISTS auth.refresh_tokens (
     expires_at  TIMESTAMP WITH TIME ZONE NOT NULL,
     revoked_at  TIMESTAMP WITH TIME ZONE
 );
+
+
+CREATE INDEX IF NOT EXISTS active_refresh_tokens_token_hash
+ON auth.refresh_tokens (token_hash)
+WHERE revoked_at IS NULL;
+
+
+CREATE INDEX IF NOT EXISTS active_refresh_tokens_family_id
+ON auth.refresh_tokens (family_id)
+WHERE revoked_at IS NULL;
