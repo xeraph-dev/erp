@@ -72,13 +72,7 @@ EXECUTE FUNCTION auth.update_modification_fields();
 
 
 CREATE OR REPLACE VIEW auth.users AS
-SELECT
-    id,
-    username,
-    email,
-    password_hash,
-    first_name,
-    last_name
+SELECT id, username, email, password_hash, first_name, last_name
 FROM auth.__users
 WHERE username <> 'system'
   AND deleted_at IS NULL
