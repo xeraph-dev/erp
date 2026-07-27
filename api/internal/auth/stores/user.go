@@ -51,7 +51,7 @@ func (store userImpl) GetByID(ctx context.Context, q db.Querier, id uuid.UUID) (
 var getUserByUsername string
 
 func (store userImpl) GetByUsername(ctx context.Context, q db.Querier, username vos.Username) (out models.User, err error) {
-	return db.QueryExactlyOneRow[models.User](userLayer+".GetByUsername", getUserByID, pgx.StrictNamedArgs{
+	return db.QueryExactlyOneRow[models.User](userLayer+".GetByUsername", getUserByUsername, pgx.StrictNamedArgs{
 		"username": username,
 	}, ctx, q, store.translate)
 }
@@ -60,7 +60,7 @@ func (store userImpl) GetByUsername(ctx context.Context, q db.Querier, username 
 var getUserByEmail string
 
 func (store userImpl) GetByEmail(ctx context.Context, q db.Querier, email vos.Email) (out models.User, err error) {
-	return db.QueryExactlyOneRow[models.User](userLayer+".GetByEmail", getUserByID, pgx.StrictNamedArgs{
+	return db.QueryExactlyOneRow[models.User](userLayer+".GetByEmail", getUserByEmail, pgx.StrictNamedArgs{
 		"email": email,
 	}, ctx, q, store.translate)
 }
@@ -69,7 +69,7 @@ func (store userImpl) GetByEmail(ctx context.Context, q db.Querier, email vos.Em
 var createUser string
 
 func (store userImpl) Create(ctx context.Context, q db.Querier, in models.User) (out models.User, err error) {
-	return db.QueryExactlyOneRow[models.User](userLayer+".Create", getUserByID, pgx.StrictNamedArgs{
+	return db.QueryExactlyOneRow[models.User](userLayer+".Create", createUser, pgx.StrictNamedArgs{
 		"username":      in.Username,
 		"email":         in.Email,
 		"password_hash": in.PasswordHash,
@@ -82,7 +82,7 @@ func (store userImpl) Create(ctx context.Context, q db.Querier, in models.User) 
 var deleteUserByID string
 
 func (store userImpl) DeleteByID(ctx context.Context, q db.Querier, id uuid.UUID) (out models.User, err error) {
-	return db.QueryExactlyOneRow[models.User](userLayer+".DeleteByID", getUserByID, pgx.StrictNamedArgs{
+	return db.QueryExactlyOneRow[models.User](userLayer+".DeleteByID", deleteUserByID, pgx.StrictNamedArgs{
 		"id": id,
 	}, ctx, q, store.translate)
 }

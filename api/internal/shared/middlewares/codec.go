@@ -27,6 +27,8 @@ func Codec(next http.Handler) http.Handler {
 		if acceptString == "" {
 			acceptString = "*/*"
 		}
+		// TODO: implement propper parsing
+		// - Accept header often includes more than one media type
 		accept, _, err := mime.ParseMediaType(acceptString)
 		if err != nil {
 			http.Error(w, "malformed Accept header", http.StatusBadRequest)

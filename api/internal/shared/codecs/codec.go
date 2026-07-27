@@ -2,7 +2,6 @@ package codecs
 
 import (
 	"io"
-	"net/http"
 )
 
 type Encoder interface {
@@ -25,6 +24,8 @@ type Codec struct {
 func NewCodec(contentType string, accept string) (codec Codec, ok bool) {
 	ok = true
 	switch contentType {
+	case "text/plain":
+		codec.decoder = textDecoder{}
 	case "*/*", "application/json":
 		codec.decoder = jsonDecoder{}
 	case "application/xml", "text/xml":
@@ -33,6 +34,8 @@ func NewCodec(contentType string, accept string) (codec Codec, ok bool) {
 		ok = false
 	}
 	switch accept {
+	case "text/plain":
+		codec.encoder = textEncoder{}
 	case "*/*", "application/json":
 		codec.encoder = jsonEncoder{}
 	case "application/xml", "text/xml":
@@ -48,9 +51,6 @@ func Default() Codec {
 	return codec
 }
 
-func (codec Codec) Decode(r *http.Request, v any) error { return codec.decoder.Decode(r.Body, v) }
-
-func (codec Codec) Encode(w http.ResponseWriter, v any) error {
-	w.Header().Set("Content-Type", codec.encoder.ContentType())
-	return codec.encoder.Encode(w, v)
-}
+func (codec Codec) ContentType() string             { return codec.encoder.ContentType() }
+func (codec Codec) Decode(r io.Reader, v any) error { return codec.decoder.Decode(r, v) }
+func (codec Codec) Encode(w io.Writer, v any) error { return codec.encoder.Encode(w, v) }

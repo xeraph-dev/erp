@@ -7,7 +7,7 @@ import (
 type Group struct {
 	mux         *http.ServeMux
 	middlewares []Middleware
-	handlers    []Handler
+	handlers    map[string]http.Handler
 }
 
 var _ Router = (*Group)(nil)
@@ -31,8 +31,8 @@ func (group *Group) Use(middlewares ...Middleware) {
 	group.middlewares = append(group.middlewares, middlewares...)
 }
 
-func (group *Group) Handle(handlers ...Handler) {
-	group.handlers = append(group.handlers, handlers...)
+func (group *Group) HandleFunc(pattern string, handler http.HandlerFunc) {
+	group.handlers[pattern] = handler
 }
 
 func (group *Group) Group(groupFunc func(group *Group)) {
@@ -42,8 +42,7 @@ func (group *Group) Group(groupFunc func(group *Group)) {
 }
 
 func (group *Group) Chain() {
-	for _, handler := range group.handlers {
-		pattern := handler.Pattern()
+	for pattern, handler := range group.handlers {
 		chainHandler := http.Handler(handler)
 		for i := len(group.middlewares) - 1; i >= 0; i-- {
 			chainHandler = group.middlewares[i](chainHandler)

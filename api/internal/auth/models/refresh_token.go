@@ -16,11 +16,15 @@ type RefreshToken struct {
 	RevokedAt sql.NullTime  `db:"revoked_at"`
 }
 
-func NewRefreshToken(token string, userID, familyID uuid.UUID, expiresAt time.Time) RefreshToken {
+func NewRefreshTokenInFamily(token string, userID, familyID uuid.UUID, expiresAt time.Time) RefreshToken {
 	return RefreshToken{
 		TokenHash: vos.NewTokenHash(token),
 		UserID:    userID,
 		FamilyID:  familyID,
 		ExpiresAt: expiresAt,
 	}
+}
+
+func NewRefreshToken(token string, userID uuid.UUID, expiresAt time.Time) RefreshToken {
+	return NewRefreshTokenInFamily(token, userID, uuid.New(), expiresAt)
 }

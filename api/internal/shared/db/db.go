@@ -15,6 +15,32 @@ type Querier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
+type TxBeginner interface {
+	Querier
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
+type Tx interface {
+	TxBeginner
+}
+
+func WithTx(ctx context.Context, b TxBeginner, txFunc func(tx Tx) (err error)) (err error) {
+	tx, err := b.Begin(ctx)
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback(ctx)
+		} else {
+			tx.Commit(ctx)
+		}
+	}()
+
+	err = txFunc(tx)
+	return
+}
+
 func SetCurrentUserID(ctx context.Context, q Querier, id uuid.UUID) (err error) {
 	_, err = q.Exec(ctx, "SET LOCAL app.current_user_id TO $1", id)
 	return

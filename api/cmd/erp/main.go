@@ -2,13 +2,15 @@ package main
 
 import (
 	"context"
-	"erp/internal/health/handlers"
+	"erp/internal/auth"
+	"erp/internal/health"
 	"erp/internal/shared/api"
 	"erp/internal/shared/config"
 	"erp/internal/shared/middlewares"
 	"fmt"
 	"log"
 	"log/slog"
+	"net/http"
 	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -51,9 +53,15 @@ func main() {
 		middlewares.Codec,
 	)
 
-	server.Handle(
-		handlers.NewHealthHandler(),
-	)
+	server.Group(health.Handlers())
+	server.Group(auth.Handlers(pool, config.JWTSecret))
+
+	server.Group(func(group *api.Group) {
+		group.Use(middlewares.Auth(config.JWTSecret))
+		group.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+	})
 
 	addr := fmt.Sprintf(":%d", config.Port)
 	logger.InfoContext(ctx, "starting server", slog.String("addr", addr))

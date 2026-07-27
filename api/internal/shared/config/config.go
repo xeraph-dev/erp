@@ -41,8 +41,8 @@ func (config Config) LogHandler() slog.Handler {
 
 	switch config.LogFormatString {
 	case "text":
-		return slog.NewTextHandler(os.Stdout, opts)
+		return slog.NewTextHandler(os.Stderr, opts)
 	default:
-		return slog.NewJSONHandler(os.Stdout, opts)
+		return slog.NewJSONHandler(os.Stderr, opts)
 	}
 }
