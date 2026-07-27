@@ -57,7 +57,10 @@ func main() {
 	server.Group(auth.Handlers(pool, config.JWTSecret))
 
 	server.Group(func(group *api.Group) {
-		group.Use(middlewares.Auth(config.JWTSecret))
+		group.Use(
+			middlewares.Auth(config.JWTSecret),
+			middlewares.CSRF,
+		)
 		group.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})

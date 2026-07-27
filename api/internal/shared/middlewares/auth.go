@@ -9,9 +9,20 @@ import (
 	"github.com/google/uuid"
 )
 
-type userIDCtxKey int
+type authTransport int
 
-const userIDKey userIDCtxKey = iota
+const (
+	noAuthTransport authTransport = iota
+	authTransportHeader
+	authTransportCookie
+)
+
+type authCtxKey int
+
+const (
+	authTransportKey authCtxKey = iota
+	userIDKey
+)
 
 func Auth(jwtSecret string) func(next http.Handler) http.Handler {
 	t := tokens.New(jwtSecret)
@@ -20,6 +31,7 @@ func Auth(jwtSecret string) func(next http.Handler) http.Handler {
 			ctx := r.Context()
 
 			var accessToken string
+			var transport authTransport
 
 			if authorization := r.Header.Get("Authorization"); authorization != "" {
 				var ok bool
@@ -32,6 +44,7 @@ func Auth(jwtSecret string) func(next http.Handler) http.Handler {
 					http.Error(w, "unauthorized", http.StatusUnauthorized)
 					return
 				}
+				transport = authTransportHeader
 			} else {
 				cookie, err := r.Cookie("access_token")
 				if err != nil || cookie.Value == "" {
@@ -39,6 +52,7 @@ func Auth(jwtSecret string) func(next http.Handler) http.Handler {
 					return
 				}
 				accessToken = cookie.Value
+				transport = authTransportCookie
 			}
 
 			userID, err := t.ParseAccessToken(accessToken)
@@ -47,10 +61,18 @@ func Auth(jwtSecret string) func(next http.Handler) http.Handler {
 				return
 			}
 
+			ctx = context.WithValue(ctx, authTransportKey, transport)
 			ctx = context.WithValue(ctx, userIDKey, userID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+func GetAuthTransport(ctx context.Context) authTransport {
+	if transport, ok := ctx.Value(authTransportKey).(authTransport); ok {
+		return transport
+	}
+	return noAuthTransport
 }
 
 func GetUserID(ctx context.Context) uuid.UUID {

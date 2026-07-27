@@ -81,7 +81,6 @@ func (tokens Tokens) issueAccessToken(userID uuid.UUID) (token string, expiresAt
 	expiresAt = now.Add(accessTokenTTL)
 
 	claims := jwt.RegisteredClaims{
-		ID:        uuid.NewString(),
 		Subject:   userID.String(),
 		ExpiresAt: jwt.NewNumericDate(expiresAt),
 		IssuedAt:  jwt.NewNumericDate(now),
