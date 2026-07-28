@@ -11,6 +11,11 @@ import (
 	"github.com/google/uuid"
 )
 
+type userClaims struct {
+	Roles []string `db:"roles"`
+	jwt.RegisteredClaims
+}
+
 var (
 	ErrUnexpectedSigningMethod = errors.New("unexpected signing method")
 	ErrInvalidAccessToken      = errors.New("invalid access token")
@@ -29,8 +34,9 @@ func New(secret string) Tokens {
 	return Tokens{secret: secret}
 }
 
-func (tokens Tokens) ParseAccessToken(accessToken string) (userID uuid.UUID, err error) {
-	token, err := jwt.ParseWithClaims(accessToken, jwt.RegisteredClaims{},
+func (tokens Tokens) ParseAccessToken(accessToken string) (userID uuid.UUID, roles []string, err error) {
+	var claims userClaims
+	token, err := jwt.ParseWithClaims(accessToken, &claims,
 		func(t *jwt.Token) (any, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("%w: %v", ErrUnexpectedSigningMethod, t.Header["alg"])
@@ -47,21 +53,20 @@ func (tokens Tokens) ParseAccessToken(accessToken string) (userID uuid.UUID, err
 	}
 
 	if !token.Valid {
-		return userID, ErrInvalidAccessToken
+		return userID, roles, ErrInvalidAccessToken
 	}
 
-	subject, _ := token.Claims.GetSubject()
-
-	userID, err = uuid.Parse(subject)
+	userID, err = uuid.Parse(claims.Subject)
 	if err != nil {
-		return userID, ErrInvalidAccessToken
+		return userID, roles, ErrInvalidAccessToken
 	}
 
+	roles = claims.Roles
 	return
 }
 
-func (tokens Tokens) IssuePair(ctx context.Context, userID uuid.UUID) (pair Pair, err error) {
-	accessToken, accessTokenExpiresAt, err := tokens.issueAccessToken(userID)
+func (tokens Tokens) IssuePair(ctx context.Context, userID uuid.UUID, roles []string) (pair Pair, err error) {
+	accessToken, accessTokenExpiresAt, err := tokens.issueAccessToken(userID, roles)
 	if err != nil {
 		return
 	}
@@ -76,15 +81,18 @@ func (tokens Tokens) IssuePair(ctx context.Context, userID uuid.UUID) (pair Pair
 	}, nil
 }
 
-func (tokens Tokens) issueAccessToken(userID uuid.UUID) (token string, expiresAt time.Time, err error) {
+func (tokens Tokens) issueAccessToken(userID uuid.UUID, roles []string) (token string, expiresAt time.Time, err error) {
 	now := time.Now()
 	expiresAt = now.Add(accessTokenTTL)
 
-	claims := jwt.RegisteredClaims{
-		Subject:   userID.String(),
-		ExpiresAt: jwt.NewNumericDate(expiresAt),
-		IssuedAt:  jwt.NewNumericDate(now),
-		NotBefore: jwt.NewNumericDate(now),
+	claims := userClaims{
+		Roles: roles,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID.String(),
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
+		},
 	}
 
 	token, err = jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(tokens.secret))

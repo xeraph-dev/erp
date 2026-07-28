@@ -36,6 +36,7 @@ type authImpl struct {
 	token   tokens.Tokens
 	user    stores.User
 	refresh stores.RefreshToken
+	role    stores.Role
 }
 
 var _ Auth = (*authImpl)(nil)
@@ -61,7 +62,21 @@ func (service authImpl) Register(ctx context.Context, in dtos.UserRegister) (out
 			}
 		}
 
-		out, err = service.token.IssuePair(ctx, user.ID)
+		if err = service.role.AssignUser(ctx, tx, user.ID); err != nil {
+			return
+		}
+
+		roles, err := service.role.GetByUserID(ctx, tx, user.ID)
+		if err != nil {
+			return
+		}
+
+		var rolesString []string
+		for _, role := range roles {
+			rolesString = append(rolesString, role.Name.String())
+		}
+
+		out, err = service.token.IssuePair(ctx, user.ID, rolesString)
 		if err != nil {
 			return
 		}
@@ -96,7 +111,17 @@ func (service authImpl) Login(ctx context.Context, in dtos.UserLogin) (out token
 		return out, fmt.Errorf("%w: %w", ErrInvalidCredentials, ErrUserPasswordNotMatch)
 	}
 
-	out, err = service.token.IssuePair(ctx, user.ID)
+	roles, err := service.role.GetByUserID(ctx, service.db, user.ID)
+	if err != nil {
+		return
+	}
+
+	var rolesString []string
+	for _, role := range roles {
+		rolesString = append(rolesString, role.Name.String())
+	}
+
+	out, err = service.token.IssuePair(ctx, user.ID, rolesString)
 	if err != nil {
 		return
 	}
@@ -151,7 +176,17 @@ func (service authImpl) Refresh(ctx context.Context, refreshToken string) (out t
 			return
 		}
 
-		out, err = service.token.IssuePair(ctx, refresh.UserID)
+		roles, err := service.role.GetByUserID(ctx, tx, refresh.UserID)
+		if err != nil {
+			return
+		}
+
+		var rolesString []string
+		for _, role := range roles {
+			rolesString = append(rolesString, role.Name.String())
+		}
+
+		out, err = service.token.IssuePair(ctx, refresh.UserID, rolesString)
 		if err != nil {
 			return
 		}

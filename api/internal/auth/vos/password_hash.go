@@ -19,22 +19,22 @@ var (
 func NewPasswordHash(raw string) (hash PasswordHash, err error) {
 	switch {
 	case len(raw) < 8:
-		err = ErrPasswordTooShort
+		return hash, ErrPasswordTooShort
 	case len(raw) > 72:
-		err = ErrPasswordTooLong
+		return hash, ErrPasswordTooLong
 	case !strings.ContainsFunc(raw, unicode.IsLower),
 		!strings.ContainsFunc(raw, unicode.IsUpper),
 		!strings.ContainsFunc(raw, unicode.IsDigit),
 		!strings.ContainsFunc(raw, isSpecialChar):
-		err = ErrPasswordWeak
+		return hash, ErrPasswordWeak
 	default:
 		var password []byte
 		password, err = bcrypt.GenerateFromPassword([]byte(raw), bcrypt.DefaultCost)
-		if err == nil {
-			hash = PasswordHash(password)
+		if err != nil {
+			return hash, err
 		}
+		return PasswordHash(password), nil
 	}
-	return
 }
 
 func isSpecialChar(r rune) bool {

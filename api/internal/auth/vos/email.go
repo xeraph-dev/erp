@@ -17,13 +17,12 @@ var (
 func NewEmail(raw string) (email Email, err error) {
 	switch {
 	case len(raw) > 254:
-		err = ErrEmailTooLong
+		return email, ErrEmailTooLong
 	case !emailPattern.MatchString(raw):
-		err = ErrEmailInvalid
+		return email, ErrEmailInvalid
 	default:
-		email = Email(strings.ToLower(raw))
+		return Email(strings.ToLower(raw)), nil
 	}
-	return
 }
 
 func (email Email) String() string {

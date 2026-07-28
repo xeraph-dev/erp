@@ -73,3 +73,11 @@ func QueryRows[T any](op, query string, args pgx.StrictNamedArgs, ctx context.Co
 
 	return
 }
+
+func Exec(op, query string, args pgx.StrictNamedArgs, ctx context.Context, q Querier, translateErrfunc func(error)error) (err error) {
+	_, err = q.Exec(ctx, query, args)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	return
+}

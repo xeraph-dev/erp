@@ -18,15 +18,14 @@ var (
 func NewUsername(raw string) (username Username, err error) {
 	switch {
 	case len(raw) < 3:
-		err = ErrUsernameTooShort
+		return username, ErrUsernameTooShort
 	case len(raw) > 32:
-		err = ErrUsernameTooLong
+		return username, ErrUsernameTooLong
 	case !usernamePattern.MatchString(raw):
-		err = ErrUsernameInvalid
+		return username, ErrUsernameInvalid
 	default:
-		username = Username(raw)
+		return Username(raw), nil
 	}
-	return
 }
 
 func (username Username) String() string {

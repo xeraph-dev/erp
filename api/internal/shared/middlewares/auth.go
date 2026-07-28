@@ -22,6 +22,7 @@ type authCtxKey int
 const (
 	authTransportKey authCtxKey = iota
 	userIDKey
+	userRolesKey
 )
 
 func Auth(jwtSecret string) func(next http.Handler) http.Handler {
@@ -55,7 +56,7 @@ func Auth(jwtSecret string) func(next http.Handler) http.Handler {
 				transport = authTransportCookie
 			}
 
-			userID, err := t.ParseAccessToken(accessToken)
+			userID, roles, err := t.ParseAccessToken(accessToken)
 			if err != nil {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
@@ -63,6 +64,7 @@ func Auth(jwtSecret string) func(next http.Handler) http.Handler {
 
 			ctx = context.WithValue(ctx, authTransportKey, transport)
 			ctx = context.WithValue(ctx, userIDKey, userID)
+			ctx = context.WithValue(ctx, userRolesKey, roles)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -80,4 +82,11 @@ func GetUserID(ctx context.Context) uuid.UUID {
 		return userID
 	}
 	return uuid.Nil
+}
+
+func GetUserRoles(ctx context.Context) []string {
+	if roles, ok := ctx.Value(userRolesKey).([]string); ok {
+		return roles
+	}
+	return nil
 }
