@@ -60,9 +60,10 @@ Authorization relies on two token types working together:
 ### Tradeoff: stale roles and permissions
 
 Because the access token's `roles` and `permissions` claims are trusted without a database lookup, any change made server-side - a role revoked, a permission granted — does not take effect until the user's current access token expires and is refreshed.
-  - This is a deliberate consequence of the stateless-JWT design, not a bug.
-  - The maximum staleness window equals the access token's lifetime.
-  - If a change needs to take effect immediately (e.g., disabling a compromised account), it must also invalidate the user's refresh token family server-side. This forces re-authentication and prevents the stale access token from being silently renewed with outdated claims once it expires — though the token itself remains valid, with its original claims, until that expiry.
+
+- This is a deliberate consequence of the stateless-JWT design, not a bug.
+- The maximum staleness window equals the access token's lifetime.
+- If a change needs to take effect immediately (e.g., disabling a compromised account), it must also invalidate the user's refresh token family server-side. This forces re-authentication and prevents the stale access token from being silently renewed with outdated claims once it expires — though the token itself remains valid, with its original claims, until that expiry.
 
 ## Logout
 
