@@ -11,6 +11,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 var dummyPasswordHash, _ = vos.NewPasswordHash("Dummy-Password-For-Timing-1!")
@@ -32,17 +34,18 @@ type Auth interface {
 }
 
 type authImpl struct {
-	db      db.TxBeginner
-	token   tokens.Tokens
-	user    stores.User
-	refresh stores.RefreshToken
-	role    stores.Role
+	db         db.TxBeginner
+	token      tokens.Tokens
+	user       stores.User
+	refresh    stores.RefreshToken
+	role       stores.Role
+	permission stores.Permission
 }
 
 var _ Auth = (*authImpl)(nil)
 
-func NewAuth(db db.TxBeginner, token tokens.Tokens, user stores.User, refresh stores.RefreshToken) Auth {
-	return authImpl{db: db, token: token, user: user, refresh: refresh}
+func NewAuth(db db.TxBeginner, token tokens.Tokens, user stores.User, refresh stores.RefreshToken, role stores.Role, permission stores.Permission) Auth {
+	return authImpl{db: db, token: token, user: user, refresh: refresh, role: role, permission: permission}
 }
 
 func (service authImpl) Register(ctx context.Context, in dtos.UserRegister) (out tokens.Pair, err error) {
@@ -66,17 +69,12 @@ func (service authImpl) Register(ctx context.Context, in dtos.UserRegister) (out
 			return
 		}
 
-		roles, err := service.role.GetByUserID(ctx, tx, user.ID)
+		permissions, err := service.getUserPermissions(ctx, tx, user.ID)
 		if err != nil {
 			return
 		}
 
-		var rolesString []string
-		for _, role := range roles {
-			rolesString = append(rolesString, role.Name.String())
-		}
-
-		out, err = service.token.IssuePair(ctx, user.ID, rolesString)
+		out, err = service.token.IssuePair(ctx, user.ID, permissions)
 		if err != nil {
 			return
 		}
@@ -111,17 +109,12 @@ func (service authImpl) Login(ctx context.Context, in dtos.UserLogin) (out token
 		return out, fmt.Errorf("%w: %w", ErrInvalidCredentials, ErrUserPasswordNotMatch)
 	}
 
-	roles, err := service.role.GetByUserID(ctx, service.db, user.ID)
+	permissions, err := service.getUserPermissions(ctx, service.db, user.ID)
 	if err != nil {
 		return
 	}
 
-	var rolesString []string
-	for _, role := range roles {
-		rolesString = append(rolesString, role.Name.String())
-	}
-
-	out, err = service.token.IssuePair(ctx, user.ID, rolesString)
+	out, err = service.token.IssuePair(ctx, user.ID, permissions)
 	if err != nil {
 		return
 	}
@@ -176,17 +169,12 @@ func (service authImpl) Refresh(ctx context.Context, refreshToken string) (out t
 			return
 		}
 
-		roles, err := service.role.GetByUserID(ctx, tx, refresh.UserID)
+		permissions, err := service.getUserPermissions(ctx, tx, refresh.UserID)
 		if err != nil {
 			return
 		}
 
-		var rolesString []string
-		for _, role := range roles {
-			rolesString = append(rolesString, role.Name.String())
-		}
-
-		out, err = service.token.IssuePair(ctx, refresh.UserID, rolesString)
+		out, err = service.token.IssuePair(ctx, refresh.UserID, permissions)
 		if err != nil {
 			return
 		}
@@ -199,6 +187,30 @@ func (service authImpl) Refresh(ctx context.Context, refreshToken string) (out t
 		return
 	}); err != nil {
 		return
+	}
+
+	return
+}
+
+func (service authImpl) getUserPermissions(ctx context.Context, q db.Querier, userID uuid.UUID) (permissionsString []string, err error) {
+	roles, err := service.role.ListByUserID(ctx, q, userID)
+	if err != nil {
+		return
+	}
+
+	for _, role := range roles {
+		permissions, err := service.permission.ListByRoleID(ctx, q, role.ID)
+		if err != nil {
+			return permissionsString, err
+		}
+		for _, permission := range permissions {
+			permissionsString = append(permissionsString, permission.Name)
+		}
+	}
+
+	permissions, err := service.permission.ListByUserID(ctx, q, userID)
+	for _, permission := range permissions {
+		permissionsString = append(permissionsString, permission.Name)
 	}
 
 	return

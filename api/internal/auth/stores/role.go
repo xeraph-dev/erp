@@ -29,7 +29,7 @@ type Role interface {
 	Assign(ctx context.Context, q db.Querier, roleID uuid.UUID, userID uuid.UUID) (err error)
 	AssignUser(ctx context.Context, q db.Querier, userID uuid.UUID) (err error)
 	AssignAdmin(ctx context.Context, q db.Querier, userID uuid.UUID) (err error)
-	GetByUserID(ctx context.Context, q db.Querier, userID uuid.UUID) (out []models.Role, err error)
+	ListByUserID(ctx context.Context, q db.Querier, userID uuid.UUID) (out []models.Role, err error)
 }
 
 type roleImpl struct{}
@@ -108,8 +108,8 @@ func (store roleImpl) AssignAdmin(ctx context.Context, q db.Querier, userID uuid
 //go:embed queries/get_roles_by_user_id.sql
 var getRolesByUserID string
 
-func (store roleImpl) GetByUserID(ctx context.Context, q db.Querier, userID uuid.UUID) (out []models.Role, err error) {
-	return db.QueryRows[models.Role](roleLayer+".GetByUserID", getRolesByUserID, pgx.StrictNamedArgs{
+func (store roleImpl) ListByUserID(ctx context.Context, q db.Querier, userID uuid.UUID) (out []models.Role, err error) {
+	return db.QueryRows[models.Role](roleLayer+".ListByUserID", getRolesByUserID, pgx.StrictNamedArgs{
 		"user_id": userID,
 	}, ctx, q, store.translate)
 }

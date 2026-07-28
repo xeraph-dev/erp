@@ -13,9 +13,11 @@ func Handlers(db db.TxBeginner, jwtSecret string) func(group *api.Group) {
 	return func(group *api.Group) {
 		user := stores.NewUser()
 		refresh := stores.NewRefreshToken()
+		role := stores.NewRole()
+		permission := stores.NewPermission()
 
 		token := tokens.New(jwtSecret)
-		auth := services.NewAuth(db, token, user, refresh)
+		auth := services.NewAuth(db, token, user, refresh, role, permission)
 
 		group.HandleFunc("POST /api/auth/register", handlers.Register(auth))
 		group.HandleFunc("POST /api/auth/login", handlers.Login(auth))

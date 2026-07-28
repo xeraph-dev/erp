@@ -12,7 +12,7 @@ import (
 )
 
 type userClaims struct {
-	Roles []string `db:"roles"`
+	Permissions []string `json:"permissions"`
 	jwt.RegisteredClaims
 }
 
@@ -34,7 +34,7 @@ func New(secret string) Tokens {
 	return Tokens{secret: secret}
 }
 
-func (tokens Tokens) ParseAccessToken(accessToken string) (userID uuid.UUID, roles []string, err error) {
+func (tokens Tokens) ParseAccessToken(accessToken string) (userID uuid.UUID, permissions []string, err error) {
 	var claims userClaims
 	token, err := jwt.ParseWithClaims(accessToken, &claims,
 		func(t *jwt.Token) (any, error) {
@@ -53,20 +53,20 @@ func (tokens Tokens) ParseAccessToken(accessToken string) (userID uuid.UUID, rol
 	}
 
 	if !token.Valid {
-		return userID, roles, ErrInvalidAccessToken
+		return userID, permissions, ErrInvalidAccessToken
 	}
 
 	userID, err = uuid.Parse(claims.Subject)
 	if err != nil {
-		return userID, roles, ErrInvalidAccessToken
+		return userID, permissions, ErrInvalidAccessToken
 	}
 
-	roles = claims.Roles
+	permissions = claims.Permissions
 	return
 }
 
-func (tokens Tokens) IssuePair(ctx context.Context, userID uuid.UUID, roles []string) (pair Pair, err error) {
-	accessToken, accessTokenExpiresAt, err := tokens.issueAccessToken(userID, roles)
+func (tokens Tokens) IssuePair(ctx context.Context, userID uuid.UUID, permissions []string) (pair Pair, err error) {
+	accessToken, accessTokenExpiresAt, err := tokens.issueAccessToken(userID, permissions)
 	if err != nil {
 		return
 	}
@@ -81,12 +81,12 @@ func (tokens Tokens) IssuePair(ctx context.Context, userID uuid.UUID, roles []st
 	}, nil
 }
 
-func (tokens Tokens) issueAccessToken(userID uuid.UUID, roles []string) (token string, expiresAt time.Time, err error) {
+func (tokens Tokens) issueAccessToken(userID uuid.UUID, permissions []string) (token string, expiresAt time.Time, err error) {
 	now := time.Now()
 	expiresAt = now.Add(accessTokenTTL)
 
 	claims := userClaims{
-		Roles: roles,
+		Permissions: permissions,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID.String(),
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
@@ -97,7 +97,7 @@ func (tokens Tokens) issueAccessToken(userID uuid.UUID, roles []string) (token s
 
 	token, err = jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(tokens.secret))
 	if err != nil {
-		return token, expiresAt, fmt.Errorf("services/JWT.IssueAccessToken: %w", err)
+		return
 	}
 
 	return
