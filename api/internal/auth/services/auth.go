@@ -192,7 +192,7 @@ func (service authImpl) Refresh(ctx context.Context, refreshToken string) (out t
 	return
 }
 
-func (service authImpl) getUserPermissions(ctx context.Context, q db.Querier, userID uuid.UUID) (permissionsString []string, err error) {
+func (service authImpl) getUserPermissions(ctx context.Context, q db.Querier, userID uuid.UUID) (permissionsNames db.Permissions, err error) {
 	roles, err := service.role.ListByUserID(ctx, q, userID)
 	if err != nil {
 		return
@@ -201,16 +201,16 @@ func (service authImpl) getUserPermissions(ctx context.Context, q db.Querier, us
 	for _, role := range roles {
 		permissions, err := service.permission.ListByRoleID(ctx, q, role.ID)
 		if err != nil {
-			return permissionsString, err
+			return permissionsNames, err
 		}
 		for _, permission := range permissions {
-			permissionsString = append(permissionsString, permission.Name)
+			permissionsNames = append(permissionsNames, db.Permission(permission.Name))
 		}
 	}
 
 	permissions, err := service.permission.ListByUserID(ctx, q, userID)
 	for _, permission := range permissions {
-		permissionsString = append(permissionsString, permission.Name)
+		permissionsNames = append(permissionsNames, db.Permission(permission.Name))
 	}
 
 	return

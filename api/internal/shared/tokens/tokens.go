@@ -3,6 +3,7 @@ package tokens
 import (
 	"context"
 	"crypto/rand"
+	"erp/internal/shared/db"
 	"errors"
 	"fmt"
 	"time"
@@ -12,7 +13,7 @@ import (
 )
 
 type userClaims struct {
-	Permissions []string `json:"permissions"`
+	Permissions db.Permissions `json:"permissions"`
 	jwt.RegisteredClaims
 }
 
@@ -34,7 +35,7 @@ func New(secret string) Tokens {
 	return Tokens{secret: secret}
 }
 
-func (tokens Tokens) ParseAccessToken(accessToken string) (userID uuid.UUID, permissions []string, err error) {
+func (tokens Tokens) ParseAccessToken(accessToken string) (userID uuid.UUID, permissions db.Permissions, err error) {
 	var claims userClaims
 	token, err := jwt.ParseWithClaims(accessToken, &claims,
 		func(t *jwt.Token) (any, error) {
@@ -65,7 +66,7 @@ func (tokens Tokens) ParseAccessToken(accessToken string) (userID uuid.UUID, per
 	return
 }
 
-func (tokens Tokens) IssuePair(ctx context.Context, userID uuid.UUID, permissions []string) (pair Pair, err error) {
+func (tokens Tokens) IssuePair(ctx context.Context, userID uuid.UUID, permissions db.Permissions) (pair Pair, err error) {
 	accessToken, accessTokenExpiresAt, err := tokens.issueAccessToken(userID, permissions)
 	if err != nil {
 		return
@@ -81,7 +82,7 @@ func (tokens Tokens) IssuePair(ctx context.Context, userID uuid.UUID, permission
 	}, nil
 }
 
-func (tokens Tokens) issueAccessToken(userID uuid.UUID, permissions []string) (token string, expiresAt time.Time, err error) {
+func (tokens Tokens) issueAccessToken(userID uuid.UUID, permissions db.Permissions) (token string, expiresAt time.Time, err error) {
 	now := time.Now()
 	expiresAt = now.Add(accessTokenTTL)
 

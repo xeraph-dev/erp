@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"context"
+	"erp/internal/shared/db"
 	"erp/internal/shared/tokens"
 	"net/http"
 	"strings"
@@ -20,9 +21,8 @@ const (
 type authCtxKey int
 
 const (
-	authTransportKey authCtxKey = iota
-	userIDKey
-	userRolesKey
+	userIDKey authCtxKey = iota
+	userPermissionsKey
 )
 
 func Auth(jwtSecret string) func(next http.Handler) http.Handler {
@@ -32,7 +32,6 @@ func Auth(jwtSecret string) func(next http.Handler) http.Handler {
 			ctx := r.Context()
 
 			var accessToken string
-			var transport authTransport
 
 			if authorization := r.Header.Get("Authorization"); authorization != "" {
 				var ok bool
@@ -45,7 +44,6 @@ func Auth(jwtSecret string) func(next http.Handler) http.Handler {
 					http.Error(w, "unauthorized", http.StatusUnauthorized)
 					return
 				}
-				transport = authTransportHeader
 			} else {
 				cookie, err := r.Cookie("access_token")
 				if err != nil || cookie.Value == "" {
@@ -53,28 +51,19 @@ func Auth(jwtSecret string) func(next http.Handler) http.Handler {
 					return
 				}
 				accessToken = cookie.Value
-				transport = authTransportCookie
 			}
 
-			userID, roles, err := t.ParseAccessToken(accessToken)
+			userID, permissions, err := t.ParseAccessToken(accessToken)
 			if err != nil {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
 
-			ctx = context.WithValue(ctx, authTransportKey, transport)
 			ctx = context.WithValue(ctx, userIDKey, userID)
-			ctx = context.WithValue(ctx, userRolesKey, roles)
+			ctx = context.WithValue(ctx, userPermissionsKey, permissions)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
-}
-
-func GetAuthTransport(ctx context.Context) authTransport {
-	if transport, ok := ctx.Value(authTransportKey).(authTransport); ok {
-		return transport
-	}
-	return noAuthTransport
 }
 
 func GetUserID(ctx context.Context) uuid.UUID {
@@ -84,9 +73,9 @@ func GetUserID(ctx context.Context) uuid.UUID {
 	return uuid.Nil
 }
 
-func GetUserRoles(ctx context.Context) []string {
-	if roles, ok := ctx.Value(userRolesKey).([]string); ok {
-		return roles
+func GetUserPermissions(ctx context.Context) db.Permissions {
+	if permissions, ok := ctx.Value(userPermissionsKey).(db.Permissions); ok {
+		return permissions
 	}
 	return nil
 }

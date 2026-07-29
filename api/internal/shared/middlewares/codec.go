@@ -35,9 +35,13 @@ func Codec(next http.Handler) http.Handler {
 			return
 		}
 
-		codec, ok := codecs.NewCodec(contentType, accept)
-		if !ok {
+		codec, contentTypeOk, acceptOk := codecs.NewCodec(contentType, accept)
+		if !contentTypeOk {
 			http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
+			return
+		}
+		if !acceptOk {
+			http.Error(w, "no acceptable media type", http.StatusNotAcceptable)
 			return
 		}
 

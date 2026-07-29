@@ -28,8 +28,16 @@ func (server *Server) Use(middlewares ...Middleware) {
 	server.middlewares = append(server.middlewares, middlewares...)
 }
 
-func (server *Server) HandleFunc(pattern string, handler http.HandlerFunc) {
-	server.mux.HandleFunc(pattern, handler)
+func (server *Server) HandleFunc(pattern string, handler http.HandlerFunc, middlewares ...Middleware) {
+	if len(middlewares) == 0 {
+		server.mux.HandleFunc(pattern, handler)
+		return
+	}
+
+	server.Group(func(group *Group) {
+		group.Use(middlewares...)
+		group.HandleFunc(pattern, handler)
+	})
 }
 
 func (server *Server) Group(groupFunc func(group *Group)) {

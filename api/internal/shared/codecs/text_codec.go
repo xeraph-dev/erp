@@ -21,7 +21,7 @@ func (textDecoder) Decode(r io.Reader, v any) error {
 	if err != nil {
 		return err
 	}
-	v = b.String()
+	*(v.(*string)) = b.String()
 	return nil
 }
 func (textEncoder) Encode(w io.Writer, v any) error {

@@ -32,8 +32,17 @@ func (group *Group) Use(middlewares ...Middleware) {
 	group.middlewares = append(group.middlewares, middlewares...)
 }
 
-func (group *Group) HandleFunc(pattern string, handler http.HandlerFunc) {
-	group.handlers[pattern] = handler
+func (group *Group) HandleFunc(pattern string, handler http.HandlerFunc, middlewares ...Middleware) {
+	if len(middlewares) == 0 {
+		group.handlers[pattern] = handler
+		return
+	}
+
+	group.Group(func(group *Group) {
+		group.Use(middlewares...)
+		group.HandleFunc(pattern, handler)
+	})
+
 }
 
 func (group *Group) Group(groupFunc func(group *Group)) {
